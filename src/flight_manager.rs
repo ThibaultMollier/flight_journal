@@ -1,14 +1,17 @@
 use rusqlite::Connection;
 use std::{fs, path::Path};
 
+use self::flight_data::FlightData;
+
+mod flight_data;
+
 pub struct FlightManager{
     db_conn: Connection,
 }
 
 pub struct  Flight{
-    id: u32,
-    date: String,
-    raw_data: String,
+    pub id: u32,
+    pub data: FlightData,
 }
 
 /*
@@ -24,10 +27,12 @@ impl FlightManager {
 
         //TODO Create table only if db doesn't existe
         flight_manager.db_conn.execute(
-            "CREATE TABLE flights IF NOT EXISTS (
+            "CREATE TABLE IF NOT EXISTS flights (
                 id    INTEGER PRIMARY KEY,
+                hash  BLOB,
                 date  DATE NOT NULL,
-                data  BLOB
+                data  BLOB,
+                UNIQUE(hash)
             )",
             (), // empty list of parameters.
         ).unwrap();
@@ -35,35 +40,33 @@ impl FlightManager {
         return flight_manager;
     }
 
-    /*
-    TODO : 
-    - It must be possible to add multiple tarck (ex pass a directory pass and add all igc file in this diretory)
-    
-     */
-    pub fn store<P: AsRef<Path>>(&self, path: P)
+    pub fn store(&self, path: &String)
     {
-        let igc = fs::read_to_string(path).unwrap();
+        let hash: &str = Path::new(path).file_name().unwrap().to_str().unwrap();
+        let igc: String = fs::read_to_string(path).unwrap();
+
+        let flight: FlightData = FlightData::load(&igc);
 
         let _ = self.db_conn.execute(
-            "INSERT INTO flight (date, data) VALUES (?1, ?2)",
-            ("08-06-2023", igc),
+            "INSERT OR IGNORE INTO flights (hash, date, data) VALUES (?1, ?2, ?3)",
+            (hash,flight.date, "".to_string()),
         ).unwrap();
     }
 
     /*
     TODO :
-    - Return a list (vec of struct ?) of  all element in database 
     - Maybe only one year ?
     */
     pub fn history(&self) -> Vec<Flight>
     {
-        let mut stmt = self.db_conn.prepare("SELECT id, date FROM flight").unwrap();
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date FROM flights ORDER BY date").unwrap();
 
         let rows = stmt.query_map([], |row| {
             Ok(Flight{
                 id: row.get(0).unwrap(),
-                date: row.get(1).unwrap(),
-                raw_data : "".to_string(),
+                data: FlightData{
+                    date: row.get(1).unwrap(),
+                },
             })
         }).unwrap();
 
