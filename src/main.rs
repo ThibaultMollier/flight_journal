@@ -1,5 +1,8 @@
+use flight_manager::FlightManager;
+
 mod flight_manager;
 
 fn main() {
-    println!("Hello, world!");
+    let flightmanager = FlightManager::new();
+    flightmanager.store("./");
 }
