@@ -32,6 +32,7 @@ impl FlightManager {
                 hash  BLOB,
                 date  DATE NOT NULL,
                 duration INTEGER,
+                distance INTEGER,
                 data  BLOB,
                 UNIQUE(hash)
             )",
@@ -49,8 +50,8 @@ impl FlightManager {
         let flight: FlightData = FlightData::compute(&igc);
 
         let _ = self.db_conn.execute(
-            "INSERT OR IGNORE INTO flights (hash, date, duration, data) VALUES (?1, ?2, ?3, ?4)",
-            (hash, flight.date, flight.duration, igc),
+            "INSERT OR IGNORE INTO flights (hash, date, duration, distance, data) VALUES (?1, ?2, ?3, ?4, ?5)",
+            (hash, flight.date, flight.duration, flight.distance, igc),
         ).unwrap();
     }
 
@@ -60,7 +61,7 @@ impl FlightManager {
     */
     pub fn history(&self) -> Vec<Flight>
     {
-        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration FROM flights ORDER BY date DESC").unwrap();
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration, distance FROM flights ORDER BY date DESC").unwrap();
 
         let rows = stmt.query_map([], |row| {
             Ok(Flight{
@@ -68,6 +69,7 @@ impl FlightManager {
                 data: FlightData{
                     date: row.get(1).unwrap(),
                     duration: row.get(2).unwrap(),
+                    distance: row.get(3).unwrap(),
                 },
             })
         }).unwrap();
@@ -84,7 +86,7 @@ impl FlightManager {
 
     pub fn get(&self, id: u32) -> Flight
     {
-        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration FROM flights WHERE id = ?1").unwrap();
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration, distance FROM flights WHERE id = ?1").unwrap();
 
         let flight = stmt.query_row([id.to_string().as_str()], |row| {
             Ok(Flight{
@@ -92,6 +94,7 @@ impl FlightManager {
                 data: FlightData{
                     date: row.get(1).unwrap(),
                     duration: row.get(2).unwrap(),
+                    distance: row.get(3).unwrap(),
                 },
             })
         }).unwrap();

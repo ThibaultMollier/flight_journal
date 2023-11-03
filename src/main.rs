@@ -38,7 +38,7 @@ fn history(fm: &FlightManager)
     let flights: Vec<flight_manager::Flight> = fm.history();
 
     for flight in flights {
-        println!("{} - {} - {}min", flight.id, flight.data.date, flight.data.duration);
+        println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id, flight.data.date, flight.data.duration / 60, flight.data.duration % 60, flight.data.distance as f32/1000.0);
     }
 }
 
