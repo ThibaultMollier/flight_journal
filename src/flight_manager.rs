@@ -98,4 +98,12 @@ impl FlightManager {
 
         return flight;
     }
+
+    pub fn delete(&self, id: u32)
+    {
+        let _ = self.db_conn.execute(
+            "DELETE FROM flights WHERE id = ?1",
+            [id],
+        ).unwrap();
+    }
 }

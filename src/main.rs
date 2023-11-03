@@ -49,11 +49,17 @@ fn select(fm: &FlightManager, id:u32)
     println!("{:?}",flight);
 }
 
+fn delete(fm: &FlightManager, id:u32)
+{
+    fm.delete(id);
+}
+
 fn main() {
     let args: clap::ArgMatches = command!()
         .arg(arg!(--add <PATH>).required(false))
         .arg(arg!(--history).required(false))
         .arg(arg!(--select <ID>).required(false))
+        .arg(arg!(--delete <ID>).required(false))
         .get_matches();
 
     let flightmanager: FlightManager = FlightManager::new();
@@ -70,6 +76,11 @@ fn main() {
 
     match args.get_one::<String>("select") {
         Some(i) => select(&flightmanager, i.parse().unwrap()),
+        None => (),
+    }
+
+    match args.get_one::<String>("delete") {
+        Some(i) => delete(&flightmanager, i.parse().unwrap()),
         None => (),
     }
 }
