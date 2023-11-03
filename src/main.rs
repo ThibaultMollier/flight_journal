@@ -38,7 +38,7 @@ fn history(fm: &FlightManager)
     let flights: Vec<flight_manager::Flight> = fm.history();
 
     for flight in flights {
-        println!("{} - {}", flight.id, flight.data.date);
+        println!("{} - {} - {}min", flight.id, flight.data.date, flight.data.duration);
     }
 }
 

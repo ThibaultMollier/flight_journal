@@ -31,6 +31,7 @@ impl FlightManager {
                 id    INTEGER PRIMARY KEY,
                 hash  BLOB,
                 date  DATE NOT NULL,
+                duration INTEGER,
                 data  BLOB,
                 UNIQUE(hash)
             )",
@@ -45,11 +46,11 @@ impl FlightManager {
         let hash: &str = Path::new(path).file_name().unwrap().to_str().unwrap();
         let igc: String = fs::read_to_string(path).unwrap();
 
-        let flight: FlightData = FlightData::load(&igc);
+        let flight: FlightData = FlightData::compute(&igc);
 
         let _ = self.db_conn.execute(
-            "INSERT OR IGNORE INTO flights (hash, date, data) VALUES (?1, ?2, ?3)",
-            (hash,flight.date, "".to_string()),
+            "INSERT OR IGNORE INTO flights (hash, date, duration, data) VALUES (?1, ?2, ?3, ?4)",
+            (hash, flight.date, flight.duration, igc),
         ).unwrap();
     }
 
@@ -59,13 +60,14 @@ impl FlightManager {
     */
     pub fn history(&self) -> Vec<Flight>
     {
-        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date FROM flights ORDER BY date").unwrap();
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration FROM flights ORDER BY date DESC").unwrap();
 
         let rows = stmt.query_map([], |row| {
             Ok(Flight{
                 id: row.get(0).unwrap(),
                 data: FlightData{
                     date: row.get(1).unwrap(),
+                    duration: row.get(2).unwrap(),
                 },
             })
         }).unwrap();
@@ -82,13 +84,14 @@ impl FlightManager {
 
     pub fn get(&self, id: u32) -> Flight
     {
-        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date FROM flights WHERE id = ?1").unwrap();
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration FROM flights WHERE id = ?1").unwrap();
 
         let flight = stmt.query_row([id.to_string().as_str()], |row| {
             Ok(Flight{
                 id: row.get(0).unwrap(),
                 data: FlightData{
                     date: row.get(1).unwrap(),
+                    duration: row.get(2).unwrap(),
                 },
             })
         }).unwrap();
