@@ -8,7 +8,7 @@ mod flight_data;
 pub struct FlightManager{
     db_conn: Connection,
 }
-
+#[derive(Debug)]
 pub struct  Flight{
     pub id: u32,
     pub data: FlightData,
@@ -22,10 +22,10 @@ impl FlightManager {
     pub fn new() -> Self
     {
         let flight_manager: FlightManager = FlightManager { 
-            db_conn: Connection::open_in_memory().unwrap(), //Open path
+            // db_conn: Connection::open_in_memory().unwrap(), //Open path
+            db_conn: Connection::open("./flight_database.db").unwrap(),
         };
 
-        //TODO Create table only if db doesn't existe
         flight_manager.db_conn.execute(
             "CREATE TABLE IF NOT EXISTS flights (
                 id    INTEGER PRIMARY KEY,
@@ -78,5 +78,21 @@ impl FlightManager {
         }
 
         return fligths;
+    }
+
+    pub fn get(&self, id: u32) -> Flight
+    {
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date FROM flights WHERE id = ?1").unwrap();
+
+        let flight = stmt.query_row([id.to_string().as_str()], |row| {
+            Ok(Flight{
+                id: row.get(0).unwrap(),
+                data: FlightData{
+                    date: row.get(1).unwrap(),
+                },
+            })
+        }).unwrap();
+
+        return flight;
     }
 }

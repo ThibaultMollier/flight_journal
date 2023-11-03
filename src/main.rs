@@ -1,5 +1,6 @@
 use flight_manager::FlightManager;
-use std::{env, fs, fs::metadata, path::Path};
+use std::{fs, fs::metadata, path::Path};
+use clap::{arg, command};
 
 mod flight_manager;
 
@@ -24,24 +25,51 @@ fn search_igc<F>(path: &String, f: &F) where
     }
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+fn add(fm: &FlightManager,path: &String)
+{
+    search_igc(path,&|file_path| {
+        println!("{}",file_path);
+        fm.store(&file_path);
+    });
+}
 
-    if args.len() < 2 {
-        panic!("not enough arguments");
+fn history(fm: &FlightManager)
+{
+    let flights: Vec<flight_manager::Flight> = fm.history();
+
+    for flight in flights {
+        println!("{} - {}", flight.id, flight.data.date);
     }
+}
+
+fn select(fm: &FlightManager, id:u32)
+{
+    let flight: flight_manager::Flight = fm.get(id);
+
+    println!("{:?}",flight);
+}
+
+fn main() {
+    let args: clap::ArgMatches = command!()
+        .arg(arg!(--add <PATH>).required(false))
+        .arg(arg!(--history).required(false))
+        .arg(arg!(--select <ID>).required(false))
+        .get_matches();
 
     let flightmanager: FlightManager = FlightManager::new();
 
-    let path: &String = &args[1];
+    match args.get_one::<String>("add") {
+        Some(s) => add(&flightmanager, s),
+        None => (),
+    }
 
-    search_igc(path,&|file_path| {
-        flightmanager.store(&file_path);
-    });
-    
-    let flights: Vec<flight_manager::Flight> = flightmanager.history();
+    match args.get_flag("history") {
+        true => history(&flightmanager),
+        false => (),
+    }
 
-    for flight in flights {
-        println!("{}",flight.data.date);
+    match args.get_one::<String>("select") {
+        Some(i) => select(&flightmanager, i.parse().unwrap()),
+        None => (),
     }
 }

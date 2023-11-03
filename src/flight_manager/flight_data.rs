@@ -1,6 +1,6 @@
 
 const IGC_DATE: &str = "HFDTE";
-
+#[derive(Debug)]
 pub struct FlightData{
     pub date: String,
 }
