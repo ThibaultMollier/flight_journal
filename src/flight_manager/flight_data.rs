@@ -1,90 +1,57 @@
-use chrono::{Utc, TimeZone, Datelike};
-use geoutils::Location;
-use std::fs::File;
-use std::io::Write;
+use std::{path::Path, fs};
+use chrono::{Utc, TimeZone, Datelike, NaiveDate};
+use geoutils::{Location, Distance};
+use self::trace_manager::{FlightTrace, FlightPoint};
+use crate::flight_manager::Error;
 
-use crate::flight_manager::flight_data::flight_simplify::FlightSimplify;
+pub mod trace_manager;
 
-use self::igc_reader::IgcReader;
-
-mod flight_simplify;
-mod igc_reader;
-
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct FlightData{
-    pub date: String,
-    pub duration: i64,
-    pub distance: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct FlightPoint{
-    time: chrono::DateTime<Utc>,
-    lat: f32,
-    long: f32,
-    alt: u32,
-    alt_gps: u32,
+    pub id:         Option<u32>,
+    pub hash:       String,
+    pub duration:   u32,
+    pub date:       NaiveDate,
+    pub distance:   u32,
+    pub takeoff:    Option<String>,
+    pub landing:    Option<String>,
+    pub tags:       Option<String>,
+    pub points:     Option<Vec<FlightPoint>>,
+    pub trace:      Option<FlightTrace>,
+    pub wing:       String,
 }
 
 impl FlightData {
-    pub fn compute(igc: &String) -> Self
+    pub fn from_igc<P: AsRef<Path>>(path: P) -> Result<FlightData,Error>
     {
-        let igc_data = IgcReader::read(igc);
-
-        let duration = igc_data.trace.last().unwrap().time - igc_data.trace.get(0).unwrap().time;
-
-        let dist = FlightData::compute_distance(&igc_data.trace);
-
-        let flightdata: FlightData = FlightData {
-            date: format!("{}-{:02}-{:02}",igc_data.date.year(),igc_data.date.month(),igc_data.date.day()),
-            duration: duration.num_minutes(),
-            distance: dist.floor() as u32,
+        let raw_igc: String = match fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(_) => return Err(Error::FileErr),
         };
-
-        return flightdata;
-    }
-
-    fn to_file(trace: &Vec<FlightPoint>)
-    {
-        let path = "./trace";
-
-        let mut output = File::create(path).unwrap();
-
-        for pt in trace
-        {
-            write!(output, "{},{}\n",pt.lat,pt.long).unwrap();
-        }
-        
-    }
-
-    fn compute_distance(trace: &Vec<FlightPoint>) -> f64
-    {
+        let trace: FlightTrace = FlightTrace::new(raw_igc);
         let mut dist: f64 = 0.0;
-        let epsilon: f32 = 0.02;
 
-        // let simplified_trace: Vec<FlightPoint> = FlightSimplify::simplify(trace, 6);
+        let duration: chrono::Duration = trace.trace.last().unwrap().time - trace.trace.get(0).unwrap().time;
 
-        let simplified_trace: Vec<FlightPoint> = FlightSimplify::douglas_peucker(trace, &epsilon);
-
-        println!("{}",simplified_trace.len());
-
-        for i in 0..simplified_trace.len()-1
+        for i in 0..trace.simplified_trace.len()-1
         {
-            dist += Location::new(simplified_trace[i].lat, simplified_trace[i].long)
-            .distance_to(&Location::new(simplified_trace[i+1].lat, simplified_trace[i+1].long)).unwrap().meters(); 
+            dist += Location::new(trace.simplified_trace[i].lat, trace.simplified_trace[i].long)
+            .distance_to(&Location::new(trace.simplified_trace[i+1].lat, trace.simplified_trace[i+1].long)).unwrap_or(Distance::from_meters(0)).meters(); 
         }
 
-        // let (simplified_trace,dist) = FlightSimplify::triangle(&simplified_trace);
-        
-        FlightData::to_file(&simplified_trace);
+        Ok(FlightData{
+            id: None,
+            hash: trace.check.clone(),
+            duration: duration.num_minutes() as u32,
+            date: trace.date,
+            distance: dist as u32,
+            takeoff: None,
+            landing: None,
+            tags: None,
+            points: None,
+            trace: Some(trace),
+            wing: "".to_string(),
+        })
 
-        println!("\t{:3.1}km",dist/1000.0);
-
-        return dist;
     }
-
-
-
-    
 }
-

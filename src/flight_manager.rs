@@ -1,112 +1,131 @@
+use std::{path::Path, fs};
+use chrono::Datelike;
 use rusqlite::Connection;
-use std::{fs, path::Path};
 
-use self::flight_data::FlightData;
+use self::flight_data::{FlightData, trace_manager::FlightTrace};
 
 mod flight_data;
 
 pub struct FlightManager{
     db_conn: Connection,
 }
-#[derive(Debug)]
-pub struct  Flight{
-    pub id: u32,
-    pub data: FlightData,
+
+#[derive(Debug,Clone)]
+pub enum Error {
+    SqlErr,
+    FileErr,
 }
 
-/*
-TODO :
-- Manage error
-*/
 impl FlightManager {
-    pub fn new() -> Self
+    pub fn new() -> Result<Self,Error>
     {
         let flight_manager: FlightManager = FlightManager { 
             // db_conn: Connection::open_in_memory().unwrap(), //Open path
-            db_conn: Connection::open("./flight_database.db").unwrap(),
+            db_conn: match Connection::open("./flight_database.db")
+            {
+                Ok(conn) => conn,
+                Err(_) => return Err(Error::SqlErr),
+            },
         };
 
-        flight_manager.db_conn.execute(
+        match flight_manager.db_conn.execute(
             "CREATE TABLE IF NOT EXISTS flights (
-                id    INTEGER PRIMARY KEY,
-                hash  BLOB,
-                date  DATE NOT NULL,
-                duration INTEGER,
-                distance INTEGER,
-                data  BLOB,
+                id          INTEGER PRIMARY KEY,
+                hash        BLOB,
+                date        DATE NOT NULL,
+                duration    INTEGER,
+                distance    INTEGER,
+                takeoff     TEXT,
+                landing     TEXT,
+                tags        TEXT,
+                wing        TEXT,
+                points      BLOB,
+                igc         BLOB,
                 UNIQUE(hash)
             )",
             (), // empty list of parameters.
-        ).unwrap();
-
-        return flight_manager;
-    }
-
-    pub fn store(&self, path: &String)
-    {
-        let hash: &str = Path::new(path).file_name().unwrap().to_str().unwrap();
-        let igc: String = fs::read_to_string(path).unwrap();
-
-        let flight: FlightData = FlightData::compute(&igc);
-
-        let _ = self.db_conn.execute(
-            "INSERT OR IGNORE INTO flights (hash, date, duration, distance, data) VALUES (?1, ?2, ?3, ?4, ?5)",
-            (hash, flight.date, flight.duration, flight.distance, igc),
-        ).unwrap();
-    }
-
-    /*
-    TODO :
-    - Maybe only one year ?
-    */
-    pub fn history(&self) -> Vec<Flight>
-    {
-        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration, distance FROM flights ORDER BY date DESC").unwrap();
-
-        let rows = stmt.query_map([], |row| {
-            Ok(Flight{
-                id: row.get(0).unwrap(),
-                data: FlightData{
-                    date: row.get(1).unwrap(),
-                    duration: row.get(2).unwrap(),
-                    distance: row.get(3).unwrap(),
-                },
-            })
-        }).unwrap();
-
-        let mut fligths: Vec<Flight> = Vec::new();
-
-        for flight in rows
-        {
-            fligths.push(flight.unwrap());
+        ) {
+           Ok(_) => (),
+           Err(_) => return Err(Error::SqlErr), 
         }
 
-        return fligths;
+        return Ok(flight_manager);
     }
-
-    pub fn get(&self, id: u32) -> Flight
+    
+    pub fn load(&self,path: &Path) -> Vec<Result<FlightData,Error>>
     {
-        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT id, date, duration, distance FROM flights WHERE id = ?1").unwrap();
-
-        let flight = stmt.query_row([id.to_string().as_str()], |row| {
-            Ok(Flight{
-                id: row.get(0).unwrap(),
-                data: FlightData{
-                    date: row.get(1).unwrap(),
-                    duration: row.get(2).unwrap(),
-                    distance: row.get(3).unwrap(),
-                },
-            })
-        }).unwrap();
-
-        return flight;
+        let flights: &mut Vec<Result<FlightData,Error>> = &mut Vec::new();
+        Self::search_igc(&path, flights,&|igc_file| FlightData::from_igc(igc_file));
+        
+        return flights.to_vec();
     }
 
-    pub fn delete(&self, id: u32)
+    pub fn store(&self, flights: Vec<Result<FlightData,Error>>)
     {
-        let _ = self.db_conn.execute(
-            "DELETE FROM flights WHERE id = ?1",
-            [id],
-        ).unwrap();
+        for flight_res in flights
+        {
+            let points = "";
+
+            match flight_res {
+                Ok(flight) => 
+                    self.db_conn.execute(
+                        "INSERT OR IGNORE INTO flights (hash, date, duration, distance, takeoff, landing, tags, wing, points, igc)
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                        (
+                            flight.hash, 
+                            format!("{}-{:02}-{:02}",flight.date.year(),flight.date.month(),flight.date.day()), 
+                            flight.duration, 
+                            flight.distance, 
+                            flight.takeoff,
+                            flight.landing,
+                            flight.tags,
+                            flight.wing,
+                            points,
+                            flight.trace.unwrap_or(FlightTrace::new("None".to_string())).raw_igc,
+                        ),
+                    ).unwrap_or(0),
+                Err(_) => 0,
+            };
+        }
     }
+
+    pub fn history(&self)//option year and month, all if none
+    {
+
+    }
+
+    fn search_igc<F,T>(path: &Path, output: &mut Vec<T>, f: &F) where
+        F: Fn(String) -> T
+    {
+        if match fs::metadata(path) {
+            Ok(md) => md.is_dir(),
+            Err(_) => false,
+        }
+        {
+            let dir: fs::ReadDir = match fs::read_dir(path){
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            for subdir in dir
+            {
+                match subdir {
+                    Ok(s) => Self::search_igc(&s.path(),output,f),
+                    Err(_) => return,
+                }
+            }
+        }else if match fs::metadata(path) {
+            Ok(md) => md.is_file(),
+            Err(_) => false,
+        } 
+        {
+            if path.extension().map(|s| s == "igc").unwrap_or(false)
+            {
+                match path.to_str() {
+                    Some(s) => output.push(f(s.to_string())),
+                    None => return,
+                }
+            }
+        }
+    }
+
 }
