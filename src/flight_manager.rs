@@ -1,5 +1,5 @@
 use std::{path::Path, fs};
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use rusqlite::Connection;
 
 use self::flight_data::{FlightData, trace_manager::FlightTrace};
@@ -42,6 +42,33 @@ impl FlightManager {
                 points      BLOB,
                 igc         BLOB,
                 UNIQUE(hash)
+            )",
+            (), // empty list of parameters.
+        ) {
+           Ok(_) => (),
+           Err(_) => return Err(Error::SqlErr), 
+        }
+
+        match flight_manager.db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS wings (
+                id          INTEGER,
+                name        TEXT,
+                info        BLOB,
+                UNIQUE(id)
+            )",
+            (), // empty list of parameters.
+        ) {
+           Ok(_) => (),
+           Err(_) => return Err(Error::SqlErr), 
+        }
+
+        match flight_manager.db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS sites (
+                id          INTEGER,
+                name        TEXT,
+                lat         BLOB,
+                long        BLOB,
+                UNIQUE(id)
             )",
             (), // empty list of parameters.
         ) {
@@ -94,17 +121,21 @@ impl FlightManager {
         let mut fligths: Vec<FlightData> = Vec::new();
         let mut stmt: rusqlite::Statement<'_>;
 
-        let mut sql = "SELECT id, date, duration, distance, tags FROM flights ORDER BY date DESC".to_string();
+        let mut sql = "SELECT id, date, duration, distance, tags FROM flights".to_string();
 
         if year.is_some()
         {
             if month.is_some()
             {
-                sql.push_str(format!(" WHERE date>={}-{}-01",year.unwrap(),month.unwrap()).as_str());
+                sql.push_str(format!(" WHERE strftime('%Y',date)=='{}' AND strftime('%m',date)=='{:02}'",year.unwrap(),month.unwrap()).as_str());
             }else {
-                sql.push_str(format!(" WHERE date>={}-01-01",year.unwrap()).as_str());
+                sql.push_str(format!(" WHERE strftime('%Y',date)=='{}'",year.unwrap()).as_str());
             }
         }
+
+        sql.push_str( " ORDER BY date DESC");
+
+        println!("{}",sql);
         
 
         match self.db_conn.prepare(&sql) {
@@ -118,11 +149,11 @@ impl FlightManager {
         let rows = stmt.query_map([], |row| {
             Ok(FlightData{
                 id: row.get(0).unwrap_or(None),
+                hash: "".to_string(),
                 date: NaiveDate::parse_from_str(&row.get::<usize,String>(1).unwrap_or("0-01-01".to_string())[..], "%Y-%m-%d").unwrap(),
                 duration: row.get(2).unwrap_or(0),
                 distance: row.get(3).unwrap_or(0),
                 tags: row.get(4).unwrap_or(None),
-                hash: "".to_string(),
                 takeoff: None,
                 landing: None,
                 points: None,
@@ -130,11 +161,6 @@ impl FlightManager {
                 wing: "".to_string(),
             })
         }).unwrap();
-
-        // for f in rows
-        // {
-        //     println!("{}",&f.unwrap().date);
-        // }
 
         for flight in rows
         {
@@ -145,6 +171,78 @@ impl FlightManager {
         }
 
         return fligths;
+    }
+
+    pub fn get_by_tags(&self, tags: String) -> Vec<FlightData>
+    {
+        let mut res: Vec<FlightData> = Vec::new();
+        let flights: Vec<FlightData> = self.history(None, None);
+
+        for flight in flights
+        {
+            let tag = flight.clone().tags.unwrap_or("none".to_string());
+            match tag.to_lowercase().find(&tags.to_lowercase()) {
+                Some(_) => res.push(flight),
+                None => (),
+            };
+        }
+
+        return res;
+    }
+
+    pub fn get_by_sites(&self, sites: String) -> Vec<FlightData>
+    {
+        let mut res: Vec<FlightData> = Vec::new();
+        let flights: Vec<FlightData> = self.history(None, None);
+
+        for flight in flights
+        {
+            let site = flight.clone().takeoff.unwrap_or("none".to_string());
+            match site.to_lowercase().find(&sites.to_lowercase()) {
+                Some(_) => res.push(flight.clone()),
+                None => (),
+            };
+
+            let site = flight.clone().landing.unwrap_or("none".to_string());
+            match site.to_lowercase().find(&sites.to_lowercase()) {
+                Some(_) => res.push(flight),
+                None => (),
+            };
+        }
+
+        return res;
+    }
+
+    pub fn get_by_id(&self, id: u32) -> FlightData
+    {
+        let mut stmt: rusqlite::Statement<'_> = self.db_conn.prepare("SELECT * FROM flights WHERE id = ?1").unwrap();
+
+        let flight = stmt.query_row([id.to_string().as_str()], |row| {
+            Ok(FlightData{
+                id: row.get(0).unwrap_or(None),
+                hash: row.get(1).unwrap_or("".to_string()),
+                date: NaiveDate::parse_from_str(&row.get::<usize,String>(2).unwrap_or("0-01-01".to_string())[..], "%Y-%m-%d").unwrap(),
+                duration: row.get(3).unwrap_or(0),
+                distance: row.get(4).unwrap_or(0),
+                takeoff: row.get(5).unwrap_or(None),
+                landing: row.get(6).unwrap_or(None),
+                tags: row.get(7).unwrap_or(None),
+                wing: row.get(8).unwrap_or("".to_string()),
+                points: None,
+                trace: FlightData::from_igc(Path::new(&row.get(10).unwrap_or("".to_string()).to_string())).unwrap().trace,
+                
+            })
+        }).unwrap();
+
+        return flight;
+    }
+
+    pub fn delete(&self, id: u32)
+    {
+        let _ = self.db_conn.execute(
+            "DELETE FROM flights WHERE id = ?1",
+            [id],
+        ).unwrap_or(0);
     }
 
     fn search_igc<F,T>(path: &Path, output: &mut Vec<T>, f: &F) where

@@ -1,6 +1,7 @@
 use std::{path::Path, fs};
-use chrono::{Utc, TimeZone, Datelike, NaiveDate, Duration};
-use geoutils::{Location, Distance};
+use std::io::Write;
+use chrono::NaiveDate;
+// use geoutils::{Location, Distance};
 use self::trace_manager::{FlightTrace, FlightPoint};
 use crate::flight_manager::Error;
 
@@ -35,7 +36,7 @@ impl Statistic for Vec<FlightData> {
         best_flight.sort_by(|a, b| b.distance.cmp(&a.distance));
 
         let index = if best_flight.len() > 3 {
-            4
+            3
         }else{
             best_flight.len()
         };
@@ -87,5 +88,18 @@ impl FlightData {
             wing: "".to_string(),
         })
 
+    }
+
+    fn to_file(trace: &Vec<FlightPoint>)
+    {
+        let path = "./trace";
+
+        let mut output = fs::File::create(path).unwrap();
+
+        for pt in trace
+        {
+            write!(output, "{},{}\n",pt.lat,pt.long).unwrap();
+        }
+        
     }
 }
