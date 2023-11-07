@@ -1,12 +1,55 @@
 use std::{path::Path, fs};
-use chrono::{Utc, TimeZone, Datelike, NaiveDate};
+use chrono::{Utc, TimeZone, Datelike, NaiveDate, Duration};
 use geoutils::{Location, Distance};
 use self::trace_manager::{FlightTrace, FlightPoint};
 use crate::flight_manager::Error;
 
 pub mod trace_manager;
 
-#[derive(Clone)]
+#[derive(Debug)]
+pub struct FlightStatistic{
+    pub duration: u32,
+    pub tot_distance: u32,
+    pub best_flight: Vec<FlightData>,
+    pub nb_flight: u32,
+}
+
+pub trait Statistic {
+    fn statistic(&self) -> FlightStatistic;
+}
+
+impl Statistic for Vec<FlightData> {
+    fn statistic(&self) -> FlightStatistic
+    {
+        let mut duration: u32 = 0;
+        let mut tot_distance: u32 = 0;
+        let mut nb_flight: u32 = 0;
+        let mut best_flight: Vec<FlightData> = self.clone();
+
+        for flight in self {
+            duration += flight.duration;
+            tot_distance += flight.distance;
+            nb_flight += 1;
+        }
+
+        best_flight.sort_by(|a, b| b.distance.cmp(&a.distance));
+
+        let index = if best_flight.len() > 3 {
+            4
+        }else{
+            best_flight.len()
+        };
+
+        FlightStatistic { 
+            duration, 
+            tot_distance, 
+            best_flight: best_flight[..index].to_vec(), 
+            nb_flight,
+        }
+    }
+}
+
+#[derive(Debug,Clone)]
 pub struct FlightData{
     pub id:         Option<u32>,
     pub hash:       String,
@@ -29,22 +72,13 @@ impl FlightData {
             Err(_) => return Err(Error::FileErr),
         };
         let trace: FlightTrace = FlightTrace::new(raw_igc);
-        let mut dist: f64 = 0.0;
-
-        let duration: chrono::Duration = trace.trace.last().unwrap().time - trace.trace.get(0).unwrap().time;
-
-        for i in 0..trace.simplified_trace.len()-1
-        {
-            dist += Location::new(trace.simplified_trace[i].lat, trace.simplified_trace[i].long)
-            .distance_to(&Location::new(trace.simplified_trace[i+1].lat, trace.simplified_trace[i+1].long)).unwrap_or(Distance::from_meters(0)).meters(); 
-        }
 
         Ok(FlightData{
             id: None,
             hash: trace.check.clone(),
-            duration: duration.num_minutes() as u32,
+            duration: trace.flight_duration(),
             date: trace.date,
-            distance: dist as u32,
+            distance: trace.total_distance(),
             takeoff: None,
             landing: None,
             tags: None,

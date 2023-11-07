@@ -9,7 +9,7 @@ const IGC_CHECK: &str = "G";
 
 const EPSILON:f32 = 0.01;
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct FlightPoint
 {
     pub time: DateTime<Utc>,
@@ -19,7 +19,7 @@ pub struct FlightPoint
     pub alt_gps: u32,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct FlightTrace
 {
     pub check:      String,
@@ -64,7 +64,26 @@ impl FlightTrace {
             simplified_trace: Self::douglas_peucker(&trace, &EPSILON), 
             trace,
         }
-    }    
+    }   
+
+    pub fn total_distance(&self) -> u32
+    {
+        let mut dist: f64 = 0.0;
+        for i in 0..self.simplified_trace.len()-1
+        {
+            dist += Location::new(self.simplified_trace[i].lat, self.simplified_trace[i].long)
+            .distance_to(&Location::new(self.simplified_trace[i+1].lat, self.simplified_trace[i+1].long)).unwrap_or(Distance::from_meters(0)).meters(); 
+        }
+
+        return dist as u32;
+    } 
+
+    pub fn flight_duration(&self) -> u32
+    {
+        let duration: chrono::Duration = self.trace.last().unwrap().time - self.trace.get(0).unwrap().time;
+
+        return duration.num_minutes() as u32;
+    }
 
     fn magnitude(p1: &FlightPoint, p2: &FlightPoint) -> f32
     {

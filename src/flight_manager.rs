@@ -1,10 +1,10 @@
 use std::{path::Path, fs};
-use chrono::Datelike;
+use chrono::{Datelike, NaiveDate};
 use rusqlite::Connection;
 
 use self::flight_data::{FlightData, trace_manager::FlightTrace};
 
-mod flight_data;
+pub mod flight_data;
 
 pub struct FlightManager{
     db_conn: Connection,
@@ -69,11 +69,11 @@ impl FlightManager {
             match flight_res {
                 Ok(flight) => 
                     self.db_conn.execute(
-                        "INSERT OR IGNORE INTO flights (hash, date, duration, distance, takeoff, landing, tags, wing, points, igc)
+                    "INSERT OR IGNORE INTO flights (hash, date, duration, distance, takeoff, landing, tags, wing, points, igc)
                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                         (
                             flight.hash, 
-                            format!("{}-{:02}-{:02}",flight.date.year(),flight.date.month(),flight.date.day()), 
+                            flight.date.format("%Y-%m-%d").to_string(),
                             flight.duration, 
                             flight.distance, 
                             flight.takeoff,
@@ -89,9 +89,62 @@ impl FlightManager {
         }
     }
 
-    pub fn history(&self)//option year and month, all if none
+    pub fn history(&self, year: Option<u32>, month: Option<u32>) -> Vec<FlightData>
     {
+        let mut fligths: Vec<FlightData> = Vec::new();
+        let mut stmt: rusqlite::Statement<'_>;
 
+        let mut sql = "SELECT id, date, duration, distance, tags FROM flights ORDER BY date DESC".to_string();
+
+        if year.is_some()
+        {
+            if month.is_some()
+            {
+                sql.push_str(format!(" WHERE date>={}-{}-01",year.unwrap(),month.unwrap()).as_str());
+            }else {
+                sql.push_str(format!(" WHERE date>={}-01-01",year.unwrap()).as_str());
+            }
+        }
+        
+
+        match self.db_conn.prepare(&sql) {
+            Ok(s) => stmt = s,
+            Err(e) => {
+                println!("{:?}",e);
+                return fligths
+            },
+        }
+
+        let rows = stmt.query_map([], |row| {
+            Ok(FlightData{
+                id: row.get(0).unwrap_or(None),
+                date: NaiveDate::parse_from_str(&row.get::<usize,String>(1).unwrap_or("0-01-01".to_string())[..], "%Y-%m-%d").unwrap(),
+                duration: row.get(2).unwrap_or(0),
+                distance: row.get(3).unwrap_or(0),
+                tags: row.get(4).unwrap_or(None),
+                hash: "".to_string(),
+                takeoff: None,
+                landing: None,
+                points: None,
+                trace: None,
+                wing: "".to_string(),
+            })
+        }).unwrap();
+
+        // for f in rows
+        // {
+        //     println!("{}",&f.unwrap().date);
+        // }
+
+        for flight in rows
+        {
+            match flight {
+                Ok(f) => fligths.push(f),
+                Err(_) => (),
+            };
+        }
+
+        return fligths;
     }
 
     fn search_igc<F,T>(path: &Path, output: &mut Vec<T>, f: &F) where

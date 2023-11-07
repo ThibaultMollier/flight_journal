@@ -1,4 +1,5 @@
 use flight_manager::FlightManager;
+use flight_manager::flight_data::Statistic;
 use std::path::Path;
 use clap::{arg, command};
 
@@ -7,16 +8,24 @@ mod flight_manager;
 fn add(fm: &FlightManager,path: &String)
 {
     let flights = fm.load(Path::new(path));
+    let fl = flights.clone();
     fm.store(flights);
+    for f in fl
+    {
+        println!("{}",f.unwrap().date);
+    }
 }
 
 fn history(fm: &FlightManager)
 {
-    // let flights: Vec<flight_manager::Flight> = fm.history();
+    let flights = fm.history(None,None);
 
     // for flight in flights {
-    //     println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id, flight.data.date, flight.data.duration / 60, flight.data.duration % 60, flight.data.distance as f32/1000.0);
+    //     println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0);
     // }
+
+    dbg!(flights.statistic());
+
 }
 
 fn select(fm: &FlightManager, id:u32)

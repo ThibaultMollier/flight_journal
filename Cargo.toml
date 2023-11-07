@@ -9,6 +9,4 @@ edition = "2021"
 chrono = "0.4.31"
 clap = { version = "4.4.7", features = ["cargo"] }
 rusqlite = { version = "0.29.0", features = ["bundled"] }
-geo = "0.26.0"
 geoutils = "0.5.1"
-gpx = "0.9.1"
