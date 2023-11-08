@@ -1,43 +1,38 @@
-use flight_manager::FlightManager;
-use flight_manager::flight_data::Statistic;
-use std::path::Path;
 use clap::{arg, command};
+use flight_manager::flight_data::Statistic;
+use flight_manager::FlightManager;
+use std::path::Path;
+use std::time::Instant;
 
-mod flight_manager;
+pub mod flight_manager;
 
-fn add(fm: &FlightManager,path: &String)
-{
-    let flights = fm.load(Path::new(path));
+fn add(fm: &FlightManager, path: &String) {
+    let flights = fm.load_traces(Path::new(path));
     let fl = flights.clone();
-    fm.store(flights);
-    for f in fl
-    {
-        println!("{}",f.unwrap().date);
+    fm.store_flights(flights);
+    for f in fl {
+        println!("{}", f.unwrap().date);
     }
 }
 
-fn history(fm: &FlightManager)
-{
-    let flights = fm.history(Some(2023),None);
+fn history(fm: &FlightManager) {
+    let flights = fm.flights_history(Some(2023), None);
 
     // for flight in flights {
     //     println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0);
     // }
 
     dbg!(flights.statistic());
-
 }
 
-fn select(fm: &FlightManager, id:u32)
-{
-    let flight = fm.get_by_id(id);
+fn select(fm: &FlightManager, id: u32) {
+    let flight = fm.get_flights_by_id(id);
 
-    println!("{:?}",flight);
+    println!("{:?}", flight);
 }
 
-fn delete(fm: &FlightManager, id:u32)
-{
-    fm.delete(id);
+fn delete(fm: &FlightManager, id: u32) {
+    fm.delete_flight(id);
 }
 
 fn main() {
@@ -48,25 +43,26 @@ fn main() {
         .arg(arg!(--delete <ID>).required(false))
         .get_matches();
 
+    let now = Instant::now();
+     
     let flightmanager: FlightManager = FlightManager::new().unwrap();
 
-    match args.get_one::<String>("add") {
-        Some(s) => add(&flightmanager, s),
-        None => (),
+    if let Some(s) = args.get_one::<String>("add") {
+        add(&flightmanager, s)
     }
 
-    match args.get_flag("history") {
-        true => history(&flightmanager),
-        false => (),
+    if args.get_flag("history") {
+        history(&flightmanager)
     }
 
-    match args.get_one::<String>("select") {
-        Some(i) => select(&flightmanager, i.parse().unwrap()),
-        None => (),
+    if let Some(i) = args.get_one::<String>("select") {
+        select(&flightmanager, i.parse().unwrap())
     }
 
-    match args.get_one::<String>("delete") {
-        Some(i) => delete(&flightmanager, i.parse().unwrap()),
-        None => (),
+    if let Some(i) = args.get_one::<String>("delete") {
+        delete(&flightmanager, i.parse().unwrap())
     }
+
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
 }
