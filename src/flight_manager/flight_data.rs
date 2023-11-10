@@ -1,11 +1,14 @@
 use chrono::NaiveDate;
-use std::io::Write;
+use geoutils::Location;
 use std::{fs, path::Path};
-// use geoutils::{Location, Distance};
 use self::trace_manager::{FlightPoint, FlightTrace};
 use crate::flight_manager::Error;
 
+use super::FlightManager;
+
 pub mod trace_manager;
+
+const DISTANCE_DETECTION: f64 = 200.0;
 
 pub struct Wing
 {
@@ -14,12 +17,14 @@ pub struct Wing
     pub info: String,
 }
 
+#[derive(Debug,Clone)]
 pub struct Site
 {
     pub id: u32,
     pub name: String,
     pub lat: f32,
     pub long: f32,
+    pub alt: u32,
     pub info: String,
 }
 
@@ -80,13 +85,29 @@ pub struct FlightData {
     pub wing: String,
 }
 
-impl FlightData {
-    pub fn from_igc<P: AsRef<Path>>(path: P) -> Result<FlightData, Error> {
+pub trait FlightCompute {
+    fn from_igc<P: AsRef<Path>>(&self, path: P) -> Result<FlightData, Error>;
+    fn site_detection(&self,trace: &FlightTrace) -> (Option<Site>, Option<Site>);
+}
+
+impl FlightCompute for FlightManager {
+    fn from_igc<P: AsRef<Path>>(&self, path: P) -> Result<FlightData, Error> {
         let raw_igc: String = match fs::read_to_string(path) {
             Ok(s) => s,
             Err(_) => return Err(Error::FileErr),
         };
         let trace: FlightTrace = FlightTrace::new(raw_igc);
+
+        let sites = self.site_detection(&trace);
+
+        let takeoff = match sites.0 {
+            None => None,
+            Some(s) => Some(s.name),
+        };
+        let landing = match sites.1 {
+            None => None,
+            Some(s) => Some(s.name),
+        };
 
         Ok(FlightData {
             id: None,
@@ -94,8 +115,8 @@ impl FlightData {
             duration: trace.flight_duration(),
             date: trace.date,
             distance: trace.total_distance(),
-            takeoff: None,
-            landing: None,
+            takeoff,
+            landing,
             tags: None,
             points: None,
             trace: Some(trace),
@@ -103,13 +124,71 @@ impl FlightData {
         })
     }
 
-    fn to_file(trace: &Vec<FlightPoint>) {
-        let path = "./trace";
+    fn site_detection(&self,trace: &FlightTrace) -> (Option<Site>, Option<Site>)
+    {
+        let sites = self.get_sites();
+        let mut res_takeoff: Option<Site> = None;
+        let mut res_landing: Option<Site> = None;
 
-        let mut output = fs::File::create(path).unwrap();
+        let takeoff = Location::new(trace.trace[0].lat,trace.trace[0].long);
+        let landing = Location::new(trace.trace.last().unwrap().lat,trace.trace.last().unwrap().long);
 
-        for pt in trace {
-            writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
+        for site in sites
+        {
+            let site_loc = Location::new(site.lat,site.long);
+            let d = takeoff.distance_to(&site_loc).unwrap().meters();
+
+            if d < DISTANCE_DETECTION
+            {
+                res_takeoff = Some(site.clone());
+            }
+
+            let d = landing.distance_to(&site_loc).unwrap().meters();
+            if d < DISTANCE_DETECTION
+            {
+                res_landing = Some(site.clone());
+            }
+
+            if res_landing.is_some() && res_takeoff.is_some()
+            {
+                break;
+            }
         }
+
+        return (res_takeoff,res_landing);
     }
 }
+
+// impl FlightData {
+//     pub fn from_igc<P: AsRef<Path>>(path: P) -> Result<FlightData, Error> {
+//         let raw_igc: String = match fs::read_to_string(path) {
+//             Ok(s) => s,
+//             Err(_) => return Err(Error::FileErr),
+//         };
+//         let trace: FlightTrace = FlightTrace::new(raw_igc);
+
+//         Ok(FlightData {
+//             id: None,
+//             hash: trace.check.clone(),
+//             duration: trace.flight_duration(),
+//             date: trace.date,
+//             distance: trace.total_distance(),
+//             takeoff: None,
+//             landing: None,
+//             tags: None,
+//             points: None,
+//             trace: Some(trace),
+//             wing: "".to_string(),
+//         })
+//     }
+
+//     fn to_file(trace: &Vec<FlightPoint>) {
+//         let path = "./trace";
+
+//         let mut output = fs::File::create(path).unwrap();
+
+//         for pt in trace {
+//             writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
+//         }
+//     }
+// }

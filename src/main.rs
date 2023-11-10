@@ -18,11 +18,11 @@ fn add(fm: &FlightManager, path: &String) {
 fn history(fm: &FlightManager) {
     let flights = fm.flights_history(Some(2023), None);
 
-    // for flight in flights {
-    //     println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0);
-    // }
+    for flight in flights {
+        println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0);
+    }
 
-    dbg!(flights.statistic());
+    // dbg!(flights.statistic());
 }
 
 fn select(fm: &FlightManager, id: u32) {
@@ -32,7 +32,7 @@ fn select(fm: &FlightManager, id: u32) {
 }
 
 fn delete(fm: &FlightManager, id: u32) {
-    fm.delete_flight(id);
+    fm.delete_flight(id).unwrap();
 }
 
 fn main() {
