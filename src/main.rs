@@ -1,6 +1,7 @@
 use clap::{arg, command};
 use flight_manager::flight_data::Statistic;
 use flight_manager::FlightManager;
+use geoutils::Location;
 use std::path::Path;
 use std::time::Instant;
 
@@ -16,10 +17,10 @@ fn add(fm: &FlightManager, path: &String) {
 }
 
 fn history(fm: &FlightManager) {
-    let flights = fm.flights_history(Some(2023), None);
+    let flights = fm.flights_history(None, None);
 
     for flight in flights {
-        println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0);
+        println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km \t{} => {}", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0,flight.takeoff.unwrap_or("".to_string()),flight.landing.unwrap_or("".to_string()));
     }
 
     // dbg!(flights.statistic());
@@ -44,6 +45,11 @@ fn main() {
         .get_matches();
 
     let now = Instant::now();
+
+    // let loc = Location::new(45.746433357719404, 6.50472513037558);
+    // let d = loc.distance_to(&Location::new(45.746433357719404 , 6.50472513037558 + 0.005)).unwrap().meters();
+
+    // dbg!(d);
      
     let flightmanager: FlightManager = FlightManager::new().unwrap();
 

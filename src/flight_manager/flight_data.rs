@@ -3,12 +3,12 @@ use geoutils::Location;
 use std::{fs, path::Path};
 use self::trace_manager::{FlightPoint, FlightTrace};
 use crate::flight_manager::Error;
-
+use std::io::Write;
 use super::FlightManager;
 
 pub mod trace_manager;
 
-const DISTANCE_DETECTION: f64 = 200.0;
+const DISTANCE_DETECTION: f64 = 150.0;
 
 pub struct Wing
 {
@@ -159,36 +159,13 @@ impl FlightCompute for FlightManager {
     }
 }
 
-// impl FlightData {
-//     pub fn from_igc<P: AsRef<Path>>(path: P) -> Result<FlightData, Error> {
-//         let raw_igc: String = match fs::read_to_string(path) {
-//             Ok(s) => s,
-//             Err(_) => return Err(Error::FileErr),
-//         };
-//         let trace: FlightTrace = FlightTrace::new(raw_igc);
 
-//         Ok(FlightData {
-//             id: None,
-//             hash: trace.check.clone(),
-//             duration: trace.flight_duration(),
-//             date: trace.date,
-//             distance: trace.total_distance(),
-//             takeoff: None,
-//             landing: None,
-//             tags: None,
-//             points: None,
-//             trace: Some(trace),
-//             wing: "".to_string(),
-//         })
-//     }
+fn _to_file(trace: &Vec<FlightPoint>) {
+    let path = "./trace";
 
-//     fn to_file(trace: &Vec<FlightPoint>) {
-//         let path = "./trace";
+    let mut output = fs::File::create(path).unwrap();
 
-//         let mut output = fs::File::create(path).unwrap();
-
-//         for pt in trace {
-//             writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
-//         }
-//     }
-// }
+    for pt in trace {
+        writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
+    }
+}

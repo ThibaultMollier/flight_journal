@@ -7,7 +7,7 @@ const IGC_DATE: &str = "FDTE";
 const IGC_RECORD: &str = "B";
 const IGC_CHECK: &str = "G";
 
-const EPSILON: f32 = 0.01;
+const EPSILON: f32 = 0.005;
 
 #[derive(Clone, Debug)]
 pub struct FlightPoint {
@@ -102,9 +102,9 @@ impl FlightTrace {
             + ((p.long - line_start.long) * (line_end.long - line_start.long)))
             / (linemag * linemag);
 
-        if !(0.0..=1.0).contains(&u) {
-            return 0.0;
-        }
+        // if !(0.0..=1.0).contains(&u) {
+        //     return 0.0;
+        // }
 
         let intersection = FlightPoint {
             lat: line_start.lat + u * (line_end.lat - line_start.lat),
@@ -213,6 +213,52 @@ impl FlightTrace {
 
         // dbg!(dmax);
         (vec![p1, p2, p3], dmax)
+    }
+
+    fn _simplify(pointlist: &Vec<FlightPoint>,n: u32) -> Vec<FlightPoint>
+    {
+        let mut dmax: f64 = 0.0;
+        let mut index: u32 = 0;
+        let mut cpt: u32 = 1;
+        let end: usize = pointlist.len();
+        let mut result: Vec<FlightPoint> = Vec::new();
+
+        if end < 3
+        {
+            return pointlist.to_vec();
+        }
+
+        for pt in pointlist.get(1..end).unwrap()
+        {
+            let d1: f64 = Location::new(pt.lat, pt.long)
+                .distance_to(&Location::new(pointlist[0].lat, pointlist[0].long)).unwrap().meters();
+
+            let d2: f64 = Location::new(pt.lat, pt.long)
+                .distance_to(&Location::new(pointlist.last().unwrap().lat, pointlist.last().unwrap().long)).unwrap().meters();
+
+            if (d1 + d2) > dmax
+            {
+                dmax = d1 + d2;
+                index = cpt;
+            }
+            cpt += 1;
+        }
+
+        if n > 0 && index > 1
+        {
+            let n = n - 1;
+
+            let res1 = Self::_simplify(&pointlist.get(..index as usize).unwrap().to_vec(), n);
+            let mut res2 = Self::_simplify(&pointlist.get(index as usize..).unwrap().to_vec(), n);
+
+            result = res1;
+            result.append(&mut res2);
+        }else {
+            result.push(pointlist[0].clone());
+            result.push(pointlist.last().unwrap().clone());
+        }
+
+        return result;
     }
 
     fn to_decimal(degree: u32, minute: f32, snew: char) -> f32 {

@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use rusqlite::Connection;
-use std::{fs, path::Path, collections::HashMap};
+use std::{fs, path::Path};
 use serde_json::Value;
 use self::flight_data::{trace_manager::FlightTrace, FlightData, FlightCompute, Wing, Site};
 
@@ -17,6 +17,7 @@ pub enum Error {
 }
 
 impl FlightManager {
+    // Open sql connection and create tables if not exist
     pub fn new() -> Result<Self, Error> {
         let flight_manager: FlightManager = FlightManager {
             // db_conn: Connection::open_in_memory().unwrap(), //Open path
@@ -83,6 +84,7 @@ impl FlightManager {
         Ok(flight_manager)
     }
 
+    //Open igc file(s) and extract data from it 
     pub fn load_traces(&self, path: &Path) -> Vec<Result<FlightData, Error>> {
         let paths: &mut Vec<String> = &mut Vec::new();
         let flights: &mut Vec<Result<FlightData, Error>> = &mut Vec::new();
@@ -96,6 +98,7 @@ impl FlightManager {
         flights.to_vec()
     }
 
+    //Store flight(s) into database
     pub fn store_flights(&self, flights: Vec<Result<FlightData, Error>>) {
         for flight_res in flights {
             let points = "";
@@ -152,11 +155,12 @@ impl FlightManager {
         }
     }
 
+    
     pub fn flights_history(&self, year: Option<u32>, month: Option<u32>) -> Vec<FlightData> {
         let mut fligths: Vec<FlightData> = Vec::new();
         let mut stmt: rusqlite::Statement<'_>;
 
-        let mut sql = "SELECT id, date, duration, distance, tags FROM flights".to_string();
+        let mut sql = "SELECT id, date, duration, distance, tags, takeoff, landing FROM flights".to_string();
 
         if year.is_some() {
             if month.is_some() {
@@ -198,8 +202,8 @@ impl FlightManager {
                     duration: row.get(2).unwrap_or(0),
                     distance: row.get(3).unwrap_or(0),
                     tags: row.get(4).unwrap_or(None),
-                    takeoff: None,
-                    landing: None,
+                    takeoff: row.get(5).unwrap_or(None),
+                    landing: row.get(6).unwrap_or(None),
                     points: None,
                     trace: None,
                     wing: "".to_string(),
