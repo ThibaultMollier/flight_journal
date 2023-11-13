@@ -20,7 +20,7 @@ fn history(fm: &FlightManager) {
     let flights = fm.flights_history(None, None);
 
     for flight in flights {
-        println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km \t{} => {}", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0,flight.takeoff.unwrap_or("".to_string()),flight.landing.unwrap_or("".to_string()));
+        println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km \t{} => {}", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0,flight.takeoff.unwrap_or(0),flight.landing.unwrap_or(0));
     }
 
     // dbg!(flights.statistic());
@@ -52,6 +52,10 @@ fn main() {
     // dbg!(d);
      
     let flightmanager: FlightManager = FlightManager::new().unwrap();
+
+    // let _f = flightmanager.get_flights_by_sites("bis".to_string());
+
+    // println!("{}",_f.len());
 
     if let Some(s) = args.get_one::<String>("add") {
         add(&flightmanager, s)

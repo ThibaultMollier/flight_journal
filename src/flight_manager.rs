@@ -27,58 +27,65 @@ impl FlightManager {
             },
         };
 
-        match flight_manager.db_conn.execute(
-            "CREATE TABLE IF NOT EXISTS flights (
-                id          INTEGER PRIMARY KEY,
-                hash        BLOB,
-                date        DATE NOT NULL,
-                duration    INTEGER,
-                distance    INTEGER,
-                takeoff     TEXT,
-                landing     TEXT,
-                tags        TEXT,
-                wing        TEXT,
-                points      BLOB,
-                igc         BLOB,
-                UNIQUE(hash)
-            )",
-            (), // empty list of parameters.
-        ) {
-            Ok(_) => (),
-            Err(_) => return Err(Error::SqlErr),
-        }
+        flight_manager.db_conn.execute("PRAGMA foreign_keys = ON;",()).unwrap();
 
         match flight_manager.db_conn.execute(
-            "CREATE TABLE IF NOT EXISTS wings (
-                id          INTEGER,
+            "CREATE TABLE wings (
+                wing_id     INTEGER PRIMARY KEY,
                 name        TEXT,
-                info        BLOB,
-                UNIQUE(id)
-            )",
+                info        TEXT
+            );",
             (), // empty list of parameters.
         ) {
-            Ok(_) => (),
-            Err(_) => return Err(Error::SqlErr),
+            Ok(_) => {flight_manager.db_conn.execute("INSERT INTO wings (wing_id,name,info) VALUES (0,'default','')",()).unwrap_or(0);},
+            Err(e) => {
+                dbg!(e);},
         }
 
         let sites = match flight_manager.db_conn.execute(
             "CREATE TABLE sites (
-                id          INTEGER PRIMARY KEY,
+                site_id     INTEGER PRIMARY KEY,
                 name        TEXT,
-                lat         BLOB,
-                long        BLOB,
+                lat         FLOAT,
+                long        FLOAT,
                 alt         INTEGER,
-                info        TEXT,
-                UNIQUE(id)
-            )",
+                info        TEXT DEFAULT 'default'
+            );",
             (), // empty list of parameters.
         ) {
             Ok(_) => Self::get_ffvl_site(),
-            Err(_) => Vec::new(),
+            Err(e) => {
+                dbg!(e);
+                Vec::new()},
         };
 
         for site in sites {
             flight_manager.store_site(site).unwrap();
+        }
+
+        match flight_manager.db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS flights (
+                flight_id    INTEGER PRIMARY KEY,
+                wing_id     INTEGER,
+                takeoff_id  INTEGER,
+                landing_id  INTEGER,
+                hash        BLOB,
+                date        DATE NOT NULL,
+                duration    INTEGER,
+                distance    INTEGER,
+                points      BLOB,
+                igc         BLOB,
+                UNIQUE(hash),
+                FOREIGN KEY(takeoff_id) REFERENCES sites(site_id),
+                FOREIGN KEY(landing_id) REFERENCES sites(site_id),
+                FOREIGN KEY(wing_id) REFERENCES wings(wing_id)
+            );",
+            (), // empty list of parameters.
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                dbg!(e);
+                return Err(Error::SqlErr)},
         }
 
         Ok(flight_manager)
@@ -105,9 +112,9 @@ impl FlightManager {
 
             match flight_res {
                 Ok(flight) =>
-                    self.db_conn.execute(
-                    "INSERT OR IGNORE INTO flights (hash, date, duration, distance, takeoff, landing, tags, wing, points, igc)
-                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    match self.db_conn.execute(
+                    "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, points, igc)
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                         (
                             flight.hash,
                             flight.date.format("%Y-%m-%d").to_string(),
@@ -115,39 +122,44 @@ impl FlightManager {
                             flight.distance,
                             flight.takeoff,
                             flight.landing,
-                            flight.tags,
                             flight.wing,
                             points,
-                            flight.trace.unwrap_or(FlightTrace::new("None".to_string())).raw_igc,
+                            flight.trace.unwrap().raw_igc,
                         ),
-                    ).unwrap_or(0),
-                Err(_) => 0,
+                    )
+                    {
+                        Ok(_) => 0,
+                        Err(e) => {
+                            dbg!(e);
+                            0
+                        }
+                    },
+                Err(e) => {
+                    dbg!(e);
+                    0
+                },
             };
         }
     }
 
-    pub fn edit_flight(&self, id: u32, tags: Option<String>, takeoff: Option<String>, landing: Option<String>, wing: Option<String>) -> Result<(),Error>
+    pub fn edit_flight(&self, id: u32, takeoff: Option<u32>, landing: Option<u32>, wing: Option<u32>) -> Result<(),Error>
     {
         let mut sql = "UPDATE flights SET ".to_string();
 
-        if tags.is_some()
-        {
-            sql.push_str(format!("tags={} ",tags.unwrap()).as_str());
-        }
         if takeoff.is_some()
         {
-            sql.push_str(format!("takeoff={} ",takeoff.unwrap()).as_str());
+            sql.push_str(format!("takeoff_id={} ",takeoff.unwrap()).as_str());
         }
         if landing.is_some()
         {
-            sql.push_str(format!("landig={} ",landing.unwrap()).as_str());
+            sql.push_str(format!("landig_id={} ",landing.unwrap()).as_str());
         }
         if wing.is_some()
         {
-            sql.push_str(format!("wing={} ",wing.unwrap()).as_str());
+            sql.push_str(format!("wing_id={} ",wing.unwrap()).as_str());
         }
 
-        sql.push_str("WHERE id=?2");
+        sql.push_str("WHERE flight_id=?1");
 
         match self.db_conn.execute(&sql, [id]) {
             Ok(_) => Ok(()),
@@ -155,12 +167,12 @@ impl FlightManager {
         }
     }
 
-    
+
     pub fn flights_history(&self, year: Option<u32>, month: Option<u32>) -> Vec<FlightData> {
         let mut fligths: Vec<FlightData> = Vec::new();
         let mut stmt: rusqlite::Statement<'_>;
 
-        let mut sql = "SELECT id, date, duration, distance, tags, takeoff, landing FROM flights".to_string();
+        let mut sql = "SELECT flight_id, date, duration, distance, takeoff_id, landing_id FROM flights".to_string();
 
         if year.is_some() {
             if month.is_some() {
@@ -201,12 +213,11 @@ impl FlightManager {
                     .unwrap(),
                     duration: row.get(2).unwrap_or(0),
                     distance: row.get(3).unwrap_or(0),
-                    tags: row.get(4).unwrap_or(None),
-                    takeoff: row.get(5).unwrap_or(None),
-                    landing: row.get(6).unwrap_or(None),
+                    takeoff: row.get(4).unwrap_or(None),
+                    landing: row.get(5).unwrap_or(None),
                     points: None,
                     trace: None,
-                    wing: "".to_string(),
+                    wing: 0,
                 })
             })
             .unwrap();
@@ -220,43 +231,88 @@ impl FlightManager {
         fligths
     }
 
-    pub fn get_flights_by_tags(&self, tags: String) -> Vec<FlightData> {
-        let mut res: Vec<FlightData> = Vec::new();
-        let flights: Vec<FlightData> = self.flights_history(None, None);
+    // pub fn get_flights_by_tags(&self, tags: String) -> Vec<FlightData> {
+    //     let mut res: Vec<FlightData> = Vec::new();
+    //     let flights: Vec<FlightData> = self.flights_history(None, None);
 
-        for flight in flights {
-            let tag = flight.clone().tags.unwrap_or("none".to_string());
-            if tag.to_lowercase().contains(&tags.to_lowercase()) {
-                res.push(flight)
+    //     for flight in flights {
+    //         let tag = flight.clone().tags.unwrap_or("none".to_string());
+    //         if tag.to_lowercase().contains(&tags.to_lowercase()) {
+    //             res.push(flight)
+    //         }
+    //     }
+
+    //     res
+    // }
+
+    pub fn get_flights_by_sites(&self, site_search: String) -> Vec<FlightData> {
+        let mut fligths: Vec<FlightData> = Vec::new();
+        let sites: Vec<Site> = self.get_sites();
+        let mut site_ids: Vec<u32> = Vec::new();
+        let mut stmt: rusqlite::Statement<'_>;
+        
+        for site in sites
+        {
+            if site.name.to_lowercase().contains(&site_search.to_lowercase())
+            {
+                site_ids.push(site.id);
             }
         }
 
-        res
-    }
+        let mut str_site_ids = "(".to_string();
 
-    pub fn get_flights_by_sites(&self, sites: String) -> Vec<FlightData> {
-        let mut res: Vec<FlightData> = Vec::new();
-        let flights: Vec<FlightData> = self.flights_history(None, None);
+        for id in site_ids
+        {
+            str_site_ids.push_str(format!("{},",id).as_str());
+        }
 
-        for flight in flights {
-            let site = flight.clone().takeoff.unwrap_or("none".to_string());
-            if site.to_lowercase().contains(&sites.to_lowercase()) {
-                res.push(flight.clone())
-            }
+        str_site_ids.pop();//remove last ','
+        str_site_ids.push(')');
 
-            let site = flight.clone().landing.unwrap_or("none".to_string());
-            if site.to_lowercase().contains(&sites.to_lowercase()) {
-                res.push(flight)
+        let sql = format!("SELECT flight_id, date, duration, distance, takeoff_id, landing_id FROM flights WHERE takeoff_id IN {} OR landing_id IN {};",str_site_ids.clone(),str_site_ids.clone());
+
+        match self.db_conn.prepare(&sql) {
+            Ok(s) => stmt = s,
+            Err(e) => {
+                println!("{:?}", e);
+                return fligths;
             }
         }
 
-        res
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(FlightData {
+                    id: row.get(0).unwrap_or(None),
+                    hash: "".to_string(),
+                    date: NaiveDate::parse_from_str(
+                        &row.get::<usize, String>(1).unwrap_or("0-01-01".to_string())[..],
+                        "%Y-%m-%d",
+                    )
+                    .unwrap(),
+                    duration: row.get(2).unwrap_or(0),
+                    distance: row.get(3).unwrap_or(0),
+                    takeoff: row.get(4).unwrap_or(None),
+                    landing: row.get(5).unwrap_or(None),
+                    points: None,
+                    trace: None,
+                    wing: 0,
+                })
+            })
+            .unwrap();
+
+        for flight in rows {
+            if let Ok(f) = flight {
+                fligths.push(f)
+            }
+        }
+
+        fligths
     }
 
     pub fn get_flights_by_id(&self, id: u32) -> FlightData {
         let mut stmt: rusqlite::Statement<'_> = self
             .db_conn
-            .prepare("SELECT * FROM flights WHERE id = ?1")
+            .prepare("SELECT * FROM flights WHERE flight_id = ?1")
             .unwrap();
 
         let flight = stmt
@@ -273,8 +329,7 @@ impl FlightManager {
                     distance: row.get(4).unwrap_or(0),
                     takeoff: row.get(5).unwrap_or(None),
                     landing: row.get(6).unwrap_or(None),
-                    tags: row.get(7).unwrap_or(None),
-                    wing: row.get(8).unwrap_or("".to_string()),
+                    wing: row.get(7).unwrap_or(0),
                     points: None,
                     trace: None,
                     // Some(FlightTrace::new(
@@ -291,7 +346,7 @@ impl FlightManager {
     {
         match self
         .db_conn
-        .execute("DELETE FROM flights WHERE id = ?1", [id]) 
+        .execute("DELETE FROM flights WHERE flight_id = ?1", [id]) 
         {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::SqlErr),
@@ -301,10 +356,9 @@ impl FlightManager {
     pub fn store_wing(&self, wing: Wing)  -> Result<(), Error>
     {
         match self.db_conn.execute(
-            "INSERT OR IGNORE INTO wings (id, name, info)
-                VALUES (?1, ?2, ?3)",
+            "INSERT OR IGNORE INTO wings (name, info)
+                VALUES (?1, ?2)",
                 (
-                    wing.id,
                     wing.name,
                     wing.info,
                 ),
@@ -328,7 +382,7 @@ impl FlightManager {
             sql.push_str(format!("info={} ",info.unwrap()).as_str());
         }
 
-        sql.push_str("WHERE id=?2");
+        sql.push_str("WHERE wing_id=?2");
         
         match self.db_conn.execute(&sql, [id]) {
             Ok(_) => Ok(()),
@@ -352,7 +406,7 @@ impl FlightManager {
         let rows = stmt
             .query_map([], |row| {
                 Ok(Wing{
-                    id: row.get(0).unwrap_or(255),
+                    id: row.get(0).unwrap_or(0),
                     name: row.get(1).unwrap_or("None".to_string()),
                     info: row.get(2).unwrap_or("".to_string()),
                 })
@@ -372,7 +426,7 @@ impl FlightManager {
     {
         match self
             .db_conn
-            .execute("DELETE FROM wings WHERE id = ?1", [id])
+            .execute("DELETE FROM wings WHERE wing_id = ?1", [id])
         {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::SqlErr),
@@ -381,20 +435,20 @@ impl FlightManager {
 
     pub fn set_default_wing(&self, id:i32) -> Result<(), Error>
     {
-        match self.db_conn.execute("UPDATE wings SET id=?1 WHERE id=?2", [-1,0]) {
-            Ok(_) => (),
-            Err(_) => return Err(Error::SqlErr),
-        }
+        // match self.db_conn.execute("UPDATE wings SET id=?1 WHERE id=?2", [-1,0]) {
+        //     Ok(_) => (),
+        //     Err(_) => return Err(Error::SqlErr),
+        // }
 
-        match self.db_conn.execute("UPDATE wings SET id=?1 WHERE id=?2", [0,id]) {
-            Ok(_) => (),
-            Err(_) => return Err(Error::SqlErr),
-        }      
+        // match self.db_conn.execute("UPDATE wings SET id=?1 WHERE id=?2", [0,id]) {
+        //     Ok(_) => (),
+        //     Err(_) => return Err(Error::SqlErr),
+        // }      
 
-        match self.db_conn.execute("UPDATE wings SET id=?1 WHERE id=?2", [id,-1]) {
-            Ok(_) => (),
-            Err(_) => return Err(Error::SqlErr),
-        }  
+        // match self.db_conn.execute("UPDATE wings SET id=?1 WHERE id=?2", [id,-1]) {
+        //     Ok(_) => (),
+        //     Err(_) => return Err(Error::SqlErr),
+        // }  
 
         Ok(())
     }
@@ -443,7 +497,7 @@ impl FlightManager {
             sql.push_str(format!("info={} ",info.unwrap()).as_str());
         }
 
-        sql.push_str("WHERE id=?2");
+        sql.push_str("WHERE site_id=?2");
         
         match self.db_conn.execute(&sql, [id]) {
             Ok(_) => Ok(()),
@@ -490,7 +544,7 @@ impl FlightManager {
     {
         match self
             .db_conn
-            .execute("DELETE FROM sites WHERE id = ?1", [id])
+            .execute("DELETE FROM sites WHERE site_id = ?1", [id])
         {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::SqlErr),

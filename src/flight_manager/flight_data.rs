@@ -77,12 +77,11 @@ pub struct FlightData {
     pub duration: u32,
     pub date: NaiveDate,
     pub distance: u32,
-    pub takeoff: Option<String>,
-    pub landing: Option<String>,
-    pub tags: Option<String>,
+    pub takeoff: Option<u32>,
+    pub landing: Option<u32>,
     pub points: Option<Vec<FlightPoint>>,
     pub trace: Option<FlightTrace>,
-    pub wing: String,
+    pub wing: u32,
 }
 
 pub trait FlightCompute {
@@ -102,11 +101,11 @@ impl FlightCompute for FlightManager {
 
         let takeoff = match sites.0 {
             None => None,
-            Some(s) => Some(s.name),
+            Some(s) => Some(s.id),
         };
         let landing = match sites.1 {
             None => None,
-            Some(s) => Some(s.name),
+            Some(s) => Some(s.id),
         };
 
         Ok(FlightData {
@@ -117,10 +116,9 @@ impl FlightCompute for FlightManager {
             distance: trace.total_distance(),
             takeoff,
             landing,
-            tags: None,
             points: None,
             trace: Some(trace),
-            wing: "".to_string(),
+            wing: 0,
         })
     }
 

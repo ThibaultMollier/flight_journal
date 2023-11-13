@@ -9,6 +9,10 @@ const IGC_CHECK: &str = "G";
 
 const EPSILON: f32 = 0.005;
 
+const NB_POINT:usize = 15;
+const HSPEED_THR:f64 = 3.0;// m/s - 11km/h
+const VSPEED_THR:f64 = 0.6;// m/s
+
 #[derive(Clone, Debug)]
 pub struct FlightPoint {
     pub time: DateTime<Utc>,
@@ -48,13 +52,55 @@ impl FlightTrace {
             }
         }
 
+        let takeoff_index = Self::flight_detection(&trace);
+        let mut reversed_trace = trace.clone();
+        // dbg!(&trace.get(takeoff_index).unwrap().time);
+        reversed_trace.reverse();
+        let landing_index = trace.len() - Self::flight_detection(&reversed_trace) - 1;
+
+        // dbg!(&trace.get(landing_index).unwrap().time);
+
         FlightTrace {
             check,
             raw_igc,
             date,
-            simplified_trace: Self::douglas_peucker(&trace, &EPSILON),
+            simplified_trace: Self::douglas_peucker(&trace[takeoff_index..landing_index].to_vec(), &EPSILON),
             trace,
         }
+    }
+
+    fn flight_detection(trace: &Vec<FlightPoint>) -> usize {
+        let mut index: usize = 0;
+
+        if trace.len() < 5
+        {
+            return index;
+        }
+        
+        for i in 0..(trace.len() - 2)
+        {
+            let mut vspeed: f64 = 0.0;
+            let mut hspeed: f64 = 0.0;
+            for j in 0..NB_POINT
+            {
+                vspeed += trace[i + j].alt as f64 - trace[i + j + 1].alt as f64;
+                let loc1 = Location::new(trace[i + j].lat,trace[i + j].long);
+                let loc2 = Location::new(trace[i + j + 1].lat,trace[i + j + 1].long);
+                hspeed += loc1.distance_to(&loc2).unwrap().meters();
+            }
+
+            vspeed = vspeed/(NB_POINT as f64);
+            hspeed = hspeed/(NB_POINT as f64);
+
+            // println!("{} {}",vspeed,hspeed);
+
+            if vspeed < -VSPEED_THR || vspeed > VSPEED_THR || hspeed > HSPEED_THR {
+                index = i;
+                break;
+            }
+        }
+
+        index
     }
 
     pub fn total_distance(&self) -> u32 {
