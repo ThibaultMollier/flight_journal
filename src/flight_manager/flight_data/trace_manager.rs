@@ -120,7 +120,7 @@ impl FlightTrace {
 
     pub fn flight_duration(&self) -> u32 {
         let duration: chrono::Duration =
-            self.trace.last().unwrap().time - self.trace.get(0).unwrap().time;
+            self.simplified_trace.last().unwrap().time - self.simplified_trace.get(0).unwrap().time;
 
         duration.num_minutes() as u32
     }
