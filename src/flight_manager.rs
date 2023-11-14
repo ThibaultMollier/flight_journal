@@ -54,10 +54,10 @@ impl FlightManager {
         ) {
             Ok(_) => {
                 // First creation of table, fill database with ffvl sites
-                let sites = Self::get_ffvl_site();
-                for site in sites {
-                    flight_manager.store_site(site).unwrap();
-                };
+                // let sites = Self::get_ffvl_site();
+                // for site in sites {
+                //     flight_manager.store_site(site).unwrap();
+                // };
             },
             Err(e) => {
                 //Table already exist don't pannic
@@ -89,12 +89,14 @@ impl FlightManager {
             "CREATE TABLE IF NOT EXISTS tags (
                 tag_id      INTEGER PRIMARY KEY,
                 name        TEXT,
+                UNIQUE(name)
             );",
             (), // empty list of parameters.
         )?;
 
         flight_manager.db_conn.execute(
-            "CREATE TABLE IF NOT EXISTS join (
+            "CREATE TABLE IF NOT EXISTS tag_asso (
+                join_id     INTEGER PRIMARY KEY,
                 tag_id      INTEGER,
                 flight_id   INTEGER,
                 FOREIGN KEY(tag_id) REFERENCES tags(tag_id),
@@ -258,7 +260,7 @@ impl FlightManager {
         str_tags_ids.pop();//remove last ','
         str_tags_ids.push(')');
 
-        let sql = format!("SELECT flight_id FROM join WHERE tag_id IN {};",str_tags_ids);
+        let sql = format!("SELECT flight_id FROM tag_asso WHERE tag_id IN {};",str_tags_ids);
 
         let mut stmt = self.db_conn.prepare(&sql)?;
 
@@ -537,6 +539,15 @@ impl FlightManager {
         Ok(())
     }
 
+    pub fn last_site_id(&self) -> Result<u32>
+    {
+        let mut stmt = self.db_conn.prepare("SELECT site_id FROM sites ORDER BY site_id DESC LIMIT 1;")?;
+
+        let id = stmt.query_row([], | row | Ok(row.get(0).unwrap_or(0)))?;
+
+        Ok(id)
+    }
+
     pub fn edit_site(&self, id: u32, name: Option<String>, lat: Option<f32>, long: Option<f32>, alt: Option<u32>, info: Option<String>) -> Result<()>
     {
         let mut sql = "UPDATE sites SET ".to_string();
@@ -604,11 +615,25 @@ impl FlightManager {
         Ok(())
     }
 
+    pub fn associate_tag(&self, tag_id: u32, flight_id: u32) -> Result<()>
+    {
+        self.db_conn.execute(
+            "INSERT OR IGNORE INTO join (tag_id, flight_id)
+                VALUES (?1, ?2)",
+                (
+                    tag_id,
+                    flight_id,
+                ),
+            )?;
+    
+            Ok(())
+    }
+
     pub fn store_tag(&self, tag: Tag) -> Result<()>
     {
         self.db_conn.execute(
         "INSERT OR IGNORE INTO tags (name)
-            VALUES (?1, ?2, ?3, ?4, ?5)",
+            VALUES (?1)",
             (
                 tag.name,
             ),

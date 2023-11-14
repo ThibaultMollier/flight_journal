@@ -8,7 +8,7 @@ use anyhow::{Result, bail};
 
 pub mod trace_manager;
 
-const DISTANCE_DETECTION: f64 = 150.0;
+const DISTANCE_DETECTION: f64 = 200.0;
 
 pub struct Tag
 {
@@ -100,14 +100,44 @@ impl FlightCompute for FlightManager {
         let raw_igc: String = fs::read_to_string(path)?;
         let trace: FlightTrace = FlightTrace::new(raw_igc);
 
+        if trace.trace.len() < 5
+        {
+            bail!("No trace available");
+        }
+
         let sites = self.site_detection(&trace).unwrap_or((None,None));
 
         let takeoff = match sites.0 {
-            None => None,
+            None => 
+            {
+                let site = Site { 
+                    id: 0, 
+                    name: "Unknown".to_string(), 
+                    lat: trace.trace[0].lat, 
+                    long: trace.trace[0].long, 
+                    alt: trace.trace[0].alt, 
+                    info: "".to_string() 
+                };
+                self.store_site(site).unwrap_or(());
+
+                Some(self.last_site_id()?)
+            },
             Some(s) => Some(s.id),
         };
         let landing = match sites.1 {
-            None => None,
+            None => {
+                let site = Site { 
+                    id: 0, 
+                    name: "Unknown".to_string(), 
+                    lat: trace.trace.last().unwrap().lat, 
+                    long: trace.trace.last().unwrap().long, 
+                    alt: trace.trace.last().unwrap().alt, 
+                    info: "".to_string() 
+                };
+                self.store_site(site).unwrap_or(());
+
+                Some(self.last_site_id()?)
+            },
             Some(s) => Some(s.id),
         };
 

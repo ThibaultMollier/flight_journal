@@ -63,7 +63,7 @@ impl FlightTrace {
             raw_igc,
             date,
             simplified_trace: Self::douglas_peucker(&trace[takeoff_index..landing_index].to_vec(), &EPSILON),
-            trace,
+            trace: trace[takeoff_index..landing_index].to_vec(),
         }
     }
 
