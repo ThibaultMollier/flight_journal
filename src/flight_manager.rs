@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use rusqlite::Connection;
-use std::{fs, path::Path, time::{Instant, SystemTime}};
+use std::{fs, path::Path};
 use serde_json::Value;
 use self::flight_data::{trace_manager::FlightTrace, FlightData, FlightCompute, Wing, Site, Tag};
 use anyhow::Result;
@@ -104,6 +104,12 @@ impl FlightManager {
         )?;
 
         Ok(flight_manager)
+    }
+
+    pub fn close(self) -> Result<()>
+    {
+        self.db_conn.close().unwrap();
+        Ok(())
     }
 
     //Open igc file(s) and extract data from it 
@@ -230,7 +236,7 @@ impl FlightManager {
     }
 
     pub fn get_flights_by_tags(&self, tag_search: String) -> Result<Vec<FlightData>> {
-        let mut res: Vec<FlightData> = Vec::new();
+        let mut flights: Vec<FlightData> = Vec::new();
         let tags = self.get_tags()?;
         let mut tag_ids = Vec::new();
 
@@ -242,20 +248,74 @@ impl FlightManager {
             }
         }
 
-        //TODO get join table then get flights
+        let mut str_tags_ids = "(".to_string();
 
-        // for flight in flights {
-        //     let tag = flight.clone().tags.unwrap_or("none".to_string());
-        //     if tag.to_lowercase().contains(&tags.to_lowercase()) {
-        //         res.push(flight)
-        //     }
-        // }
+        for id in tag_ids
+        {
+            str_tags_ids.push_str(format!("{},",id).as_str());
+        }
 
-        Ok(res)
+        str_tags_ids.pop();//remove last ','
+        str_tags_ids.push(')');
+
+        let sql = format!("SELECT flight_id FROM join WHERE tag_id IN {};",str_tags_ids);
+
+        let mut stmt = self.db_conn.prepare(&sql)?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(row.get(0).unwrap_or(0))
+            })?;
+
+        let mut str_flight_ids = "(".to_string();
+
+        for id in rows
+        {
+            if let Ok(f) = id
+            {
+                str_flight_ids.push_str(format!("{},",f).as_str());
+            }
+            
+        }
+
+        str_flight_ids.pop();//remove last ','
+        str_flight_ids.push(')');
+
+        let sql = format!("SELECT flight_id, date, duration, distance, takeoff_id, landing_id FROM flights WHERE flight_id IN {};",str_flight_ids);
+
+        let mut stmt = self.db_conn.prepare(&sql)?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(FlightData {
+                    id: row.get(0).unwrap_or(None),
+                    hash: "".to_string(),
+                    date: NaiveDate::parse_from_str(
+                        &row.get::<usize, String>(1).unwrap_or("0-01-01".to_string())[..],
+                        "%Y-%m-%d",
+                    )
+                    .unwrap(),
+                    duration: row.get(2).unwrap_or(0),
+                    distance: row.get(3).unwrap_or(0),
+                    takeoff: row.get(4).unwrap_or(None),
+                    landing: row.get(5).unwrap_or(None),
+                    points: None,
+                    trace: None,
+                    wing: 0,
+                })
+            })?;
+
+        for flight in rows {
+            if let Ok(f) = flight {
+                flights.push(f)
+            }
+        }
+
+        Ok(flights)
     }
 
     pub fn get_flights_by_wing(&self, wing_id: u32) -> Result<Vec<FlightData>> {
-        let mut fligths: Vec<FlightData> = Vec::new();
+        let mut flights: Vec<FlightData> = Vec::new();
 
         let mut stmt = self.db_conn.prepare("SELECT flight_id, date, duration, distance, takeoff_id, landing_id FROM flights WHERE wing_id=?1;")?;
 
@@ -281,11 +341,11 @@ impl FlightManager {
 
         for flight in rows {
             if let Ok(f) = flight {
-                fligths.push(f)
+                flights.push(f)
             }
         }
 
-        Ok(fligths)
+        Ok(flights)
     }
 
     pub fn get_flights_by_sites(&self, site_search: String) -> Result<Vec<FlightData>> {
@@ -365,10 +425,9 @@ impl FlightManager {
                     landing: row.get(3).unwrap_or(None),
                     wing: row.get(1).unwrap_or(0),
                     points: None,
-                    trace: None,
-                    // Some(FlightTrace::new(
-                    //     row.get(10).unwrap_or("".to_string()).to_string(),
-                    // )),
+                    trace: Some(FlightTrace::new(
+                        row.get(10).unwrap_or("".to_string()).to_string(),
+                    )),
                 })
             })?;
 
