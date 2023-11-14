@@ -27,13 +27,13 @@ impl FlightManager {
                 wing_id     INTEGER PRIMARY KEY,
                 name        TEXT,
                 info        TEXT,
-                default     BOOLEAN
+                def         BOOLEAN
             );",
             (), // empty list of parameters.
         ) {
             Ok(_) => {
                 // First creation of table, insert default wing
-                flight_manager.db_conn.execute("INSERT INTO wings (wing_id,name,info,default) VALUES (0,'default','',1)",())?;
+                flight_manager.db_conn.execute("INSERT INTO wings (wing_id,name,info,def) VALUES (0,'default','',1)",())?;
             },
             Err(e) => {
                 //Table already exist don't pannic
@@ -359,7 +359,7 @@ impl FlightManager {
     pub fn store_wing(&self, wing: Wing)  -> Result<()>
     {
         self.db_conn.execute(
-        "INSERT OR IGNORE INTO wings (name, info, default)
+        "INSERT OR IGNORE INTO wings (name, info, def)
             VALUES (?1, ?2, ?3)",
             (
                 wing.name,
@@ -426,9 +426,9 @@ impl FlightManager {
 
     pub fn set_default_wing(&self, id:i32) -> Result<()>
     {
-        self.db_conn.execute("UPDATE wings SET default=?1 WHERE default=?2", [0,1])?;
+        self.db_conn.execute("UPDATE wings SET def=?1 WHERE def=?2", [0,1])?;
 
-        self.db_conn.execute("UPDATE wings SET default=?1 WHERE wing_id=?2", [1,id])?;
+        self.db_conn.execute("UPDATE wings SET def=?1 WHERE wing_id=?2", [1,id])?;
 
         Ok(())
     }
