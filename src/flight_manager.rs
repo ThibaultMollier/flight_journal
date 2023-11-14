@@ -1,8 +1,8 @@
 use chrono::NaiveDate;
 use rusqlite::Connection;
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::{Instant, SystemTime}};
 use serde_json::Value;
-use self::flight_data::{trace_manager::FlightTrace, FlightData, FlightCompute, Wing, Site};
+use self::flight_data::{trace_manager::FlightTrace, FlightData, FlightCompute, Wing, Site, Tag};
 use anyhow::Result;
 
 pub mod flight_data;
@@ -67,7 +67,7 @@ impl FlightManager {
 
         flight_manager.db_conn.execute(
             "CREATE TABLE IF NOT EXISTS flights (
-                flight_id    INTEGER PRIMARY KEY,
+                flight_id   INTEGER PRIMARY KEY,
                 wing_id     INTEGER,
                 takeoff_id  INTEGER,
                 landing_id  INTEGER,
@@ -81,6 +81,24 @@ impl FlightManager {
                 FOREIGN KEY(takeoff_id) REFERENCES sites(site_id),
                 FOREIGN KEY(landing_id) REFERENCES sites(site_id),
                 FOREIGN KEY(wing_id) REFERENCES wings(wing_id)
+            );",
+            (), // empty list of parameters.
+        )?;
+
+        flight_manager.db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS tags (
+                tag_id      INTEGER PRIMARY KEY,
+                name        TEXT,
+            );",
+            (), // empty list of parameters.
+        )?;
+
+        flight_manager.db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS join (
+                tag_id      INTEGER,
+                flight_id   INTEGER,
+                FOREIGN KEY(tag_id) REFERENCES tags(tag_id),
+                FOREIGN KEY(flight_id) REFERENCES flights(flight_id)
             );",
             (), // empty list of parameters.
         )?;
@@ -156,7 +174,6 @@ impl FlightManager {
         Ok(())
     }
 
-
     pub fn flights_history(&self, year: Option<u32>, month: Option<u32>) -> Result<Vec<FlightData>> {
         let mut fligths: Vec<FlightData> = Vec::new();
 
@@ -212,19 +229,30 @@ impl FlightManager {
         Ok(fligths)
     }
 
-    // pub fn get_flights_by_tags(&self, tags: String) -> Vec<FlightData> {
-    //     let mut res: Vec<FlightData> = Vec::new();
-    //     let flights: Vec<FlightData> = self.flights_history(None, None);
+    pub fn get_flights_by_tags(&self, tag_search: String) -> Result<Vec<FlightData>> {
+        let mut res: Vec<FlightData> = Vec::new();
+        let tags = self.get_tags()?;
+        let mut tag_ids = Vec::new();
 
-    //     for flight in flights {
-    //         let tag = flight.clone().tags.unwrap_or("none".to_string());
-    //         if tag.to_lowercase().contains(&tags.to_lowercase()) {
-    //             res.push(flight)
-    //         }
-    //     }
+        for tag in tags
+        {
+            if tag.name.to_lowercase().contains(&tag_search.to_lowercase())
+            {
+                tag_ids.push(tag.id);
+            }
+        }
 
-    //     res
-    // }
+        //TODO get join table then get flights
+
+        // for flight in flights {
+        //     let tag = flight.clone().tags.unwrap_or("none".to_string());
+        //     if tag.to_lowercase().contains(&tags.to_lowercase()) {
+        //         res.push(flight)
+        //     }
+        // }
+
+        Ok(res)
+    }
 
     pub fn get_flights_by_wing(&self, wing_id: u32) -> Result<Vec<FlightData>> {
         let mut fligths: Vec<FlightData> = Vec::new();
@@ -513,6 +541,49 @@ impl FlightManager {
         self
             .db_conn
             .execute("DELETE FROM sites WHERE site_id = ?1", [id])?;
+
+        Ok(())
+    }
+
+    pub fn store_tag(&self, tag: Tag) -> Result<()>
+    {
+        self.db_conn.execute(
+        "INSERT OR IGNORE INTO tags (name)
+            VALUES (?1, ?2, ?3, ?4, ?5)",
+            (
+                tag.name,
+            ),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn get_tags(&self) -> Result<Vec<Tag>>
+    {
+        let mut tags: Vec<Tag> = Vec::new();
+        let mut stmt = self.db_conn.prepare("SELECT * FROM tags")?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(Tag{
+                    id: row.get(0).unwrap_or(255),
+                    name: row.get(1).unwrap_or("None".to_string()),
+                })
+            })?;
+
+        for tag in rows {
+            if let Ok(f) = tag {
+                tags.push(f)
+            }
+        }
+
+        Ok(tags)
+    }
+
+    pub fn delete_tag(&self, id: i32) -> Result<()>
+    {
+        self.db_conn
+            .execute("DELETE FROM tags WHERE tag_id = ?1", [id])?;
 
         Ok(())
     }

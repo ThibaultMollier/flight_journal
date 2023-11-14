@@ -10,6 +10,11 @@ pub mod trace_manager;
 
 const DISTANCE_DETECTION: f64 = 150.0;
 
+pub struct Tag
+{
+    pub id: u32,
+    pub name: String,
+}
 pub struct Wing
 {
     pub id: u32,
@@ -35,6 +40,20 @@ pub struct FlightStatistic {
     pub tot_distance: u32,
     pub best_flight: Vec<FlightData>,
     pub nb_flight: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct FlightData {
+    pub id: Option<u32>,
+    pub hash: String,
+    pub duration: u32,
+    pub date: NaiveDate,
+    pub distance: u32,
+    pub takeoff: Option<u32>,
+    pub landing: Option<u32>,
+    pub points: Option<Vec<FlightPoint>>,
+    pub trace: Option<FlightTrace>,
+    pub wing: u32,
 }
 
 pub trait Statistic {
@@ -69,20 +88,6 @@ impl Statistic for Vec<FlightData> {
             nb_flight,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct FlightData {
-    pub id: Option<u32>,
-    pub hash: String,
-    pub duration: u32,
-    pub date: NaiveDate,
-    pub distance: u32,
-    pub takeoff: Option<u32>,
-    pub landing: Option<u32>,
-    pub points: Option<Vec<FlightPoint>>,
-    pub trace: Option<FlightTrace>,
-    pub wing: u32,
 }
 
 pub trait FlightCompute {

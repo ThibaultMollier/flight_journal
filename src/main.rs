@@ -73,3 +73,25 @@ fn main() {
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed);
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use crate::flight_manager::FlightManager;
+
+    #[test]
+    fn test() {
+        let flightmanager: FlightManager = FlightManager::new().unwrap();
+        let flights = flightmanager.load_traces(Path::new("./test.igc"));
+        assert_eq!(flights.len(), 1);
+        flightmanager.store_flights(flights).unwrap();
+    }
+
+    #[test]
+    fn test1() {
+        let flightmanager: FlightManager = FlightManager::new().unwrap();
+        let flights = flightmanager.load_traces(Path::new("./test1.igc"));
+        assert_eq!(flights.len(), 1);
+        flightmanager.store_flights(flights).unwrap();
+    }
+}

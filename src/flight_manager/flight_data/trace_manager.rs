@@ -55,11 +55,8 @@ impl FlightTrace {
 
         let takeoff_index = Self::flight_detection(&trace);
         let mut reversed_trace = trace.clone();
-        // dbg!(&trace.get(takeoff_index).unwrap().time);
         reversed_trace.reverse();
         let landing_index = trace.len() - Self::flight_detection(&reversed_trace) - 1;
-
-        // dbg!(&trace.get(landing_index).unwrap().time);
 
         FlightTrace {
             check,
