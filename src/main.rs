@@ -9,15 +9,12 @@ pub mod flight_manager;
 
 fn add(fm: &FlightManager, path: &String) {
     let flights = fm.load_traces(Path::new(path));
-    let fl = flights.clone();
-    fm.store_flights(flights);
-    for f in fl {
-        println!("{}", f.unwrap().date);
-    }
+    println!("{} flights found",flights.len());
+    fm.store_flights(flights).unwrap();
 }
 
 fn history(fm: &FlightManager) {
-    let flights = fm.flights_history(None, None);
+    let flights = fm.flights_history(None, None).unwrap();
 
     for flight in flights {
         println!("{}\t - \t{}\t - \t{}h{}min\t - \t{:3.1}km \t{} => {}", flight.id.unwrap(), flight.date, flight.duration / 60, flight.duration % 60, flight.distance as f32/1000.0,flight.takeoff.unwrap_or(0),flight.landing.unwrap_or(0));
@@ -27,7 +24,7 @@ fn history(fm: &FlightManager) {
 }
 
 fn select(fm: &FlightManager, id: u32) {
-    let flight = fm.get_flights_by_id(id);
+    let flight = fm.get_flights_by_id(id).unwrap();
 
     println!("{:?}", flight);
 }

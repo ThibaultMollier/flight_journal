@@ -2,9 +2,9 @@ use chrono::NaiveDate;
 use geoutils::Location;
 use std::{fs, path::Path};
 use self::trace_manager::{FlightPoint, FlightTrace};
-use crate::flight_manager::Error;
 use std::io::Write;
 use super::FlightManager;
+use anyhow::{Result, bail};
 
 pub mod trace_manager;
 
@@ -86,19 +86,16 @@ pub struct FlightData {
 }
 
 pub trait FlightCompute {
-    fn from_igc<P: AsRef<Path>>(&self, path: P) -> Result<FlightData, Error>;
-    fn site_detection(&self,trace: &FlightTrace) -> (Option<Site>, Option<Site>);
+    fn from_igc<P: AsRef<Path>>(&self, path: P) -> Result<FlightData>;
+    fn site_detection(&self,trace: &FlightTrace) -> Result<(Option<Site>, Option<Site>)>;
 }
 
 impl FlightCompute for FlightManager {
-    fn from_igc<P: AsRef<Path>>(&self, path: P) -> Result<FlightData, Error> {
-        let raw_igc: String = match fs::read_to_string(path) {
-            Ok(s) => s,
-            Err(_) => return Err(Error::FileErr),
-        };
+    fn from_igc<P: AsRef<Path>>(&self, path: P) -> Result<FlightData> {
+        let raw_igc: String = fs::read_to_string(path)?;
         let trace: FlightTrace = FlightTrace::new(raw_igc);
 
-        let sites = self.site_detection(&trace);
+        let sites = self.site_detection(&trace).unwrap_or((None,None));
 
         let takeoff = match sites.0 {
             None => None,
@@ -123,11 +120,16 @@ impl FlightCompute for FlightManager {
         })
     }
 
-    fn site_detection(&self,trace: &FlightTrace) -> (Option<Site>, Option<Site>)
+    fn site_detection(&self,trace: &FlightTrace) -> Result<(Option<Site>, Option<Site>)>
     {
-        let sites = self.get_sites();
+        let sites = self.get_sites()?;
         let mut res_takeoff: Option<Site> = None;
         let mut res_landing: Option<Site> = None;
+
+        if trace.trace.len() < 5
+        {
+            bail!("Incorrect trace length");
+        }
 
         let takeoff = Location::new(trace.trace[0].lat,trace.trace[0].long);
         let landing = Location::new(trace.trace.last().unwrap().lat,trace.trace.last().unwrap().long);
@@ -154,7 +156,7 @@ impl FlightCompute for FlightManager {
             }
         }
 
-        return (res_takeoff,res_landing);
+        return Ok((res_takeoff,res_landing));
     }
 }
 

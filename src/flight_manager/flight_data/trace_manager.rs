@@ -1,5 +1,6 @@
 use chrono::{DateTime, Datelike, LocalResult, NaiveDate, TimeZone, Utc};
 use geoutils::{Distance, Location};
+use anyhow::{Result, bail};
 
 const IGC_HEADER: &str = "H";
 const IGC_DATE: &str = "FDTE";
@@ -105,6 +106,12 @@ impl FlightTrace {
 
     pub fn total_distance(&self) -> u32 {
         let mut dist: f64 = 0.0;
+
+        if self.simplified_trace.len() < 2
+        {
+            return 0;
+        }
+
         for i in 0..self.simplified_trace.len() - 1 {
             dist += Location::new(self.simplified_trace[i].lat, self.simplified_trace[i].long)
                 .distance_to(&Location::new(
@@ -119,6 +126,11 @@ impl FlightTrace {
     }
 
     pub fn flight_duration(&self) -> u32 {
+        if self.simplified_trace.len() < 2
+        {
+            return 0;
+        }
+
         let duration: chrono::Duration =
             self.simplified_trace.last().unwrap().time - self.simplified_trace.get(0).unwrap().time;
 
@@ -318,7 +330,7 @@ impl FlightTrace {
         decimal
     }
 
-    fn process_date(line: &str) -> Result<NaiveDate, ()> {
+    fn process_date(line: &str) -> Result<NaiveDate> {
         let mut c = line.chars().peekable();
         //Search the first numeric value on the line if the file doesn't respect the format
         while !c.next_if(|&x| !x.is_numeric()).unwrap_or('0').is_numeric() {}
@@ -336,7 +348,7 @@ impl FlightTrace {
         let date = NaiveDate::from_ymd_opt(year, month, day);
 
         match date {
-            None => Err(()),
+            None => bail!("Igc date extract failed"),
             Some(d) => Ok(d),
         }
     }
