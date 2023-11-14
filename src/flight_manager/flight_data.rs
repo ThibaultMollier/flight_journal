@@ -15,6 +15,7 @@ pub struct Wing
     pub id: u32,
     pub name: String,
     pub info: String,
+    pub default: Option<bool>,
 }
 
 #[derive(Debug,Clone)]
