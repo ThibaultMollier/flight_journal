@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use std::{fs, path::Path};
 use serde_json::Value;
 use self::flight_data::{trace_manager::FlightTrace, FlightData, FlightCompute, Wing, Site, Tag};
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 pub mod flight_data;
 
@@ -16,7 +16,7 @@ impl FlightManager {
     pub fn new() -> Result<Self> {
 
         let flight_manager: FlightManager = FlightManager {
-            // db_conn: Connection::open_in_memory().unwrap(), //Open path
+            // db_conn: Connection::open_in_memory()?,//for test only
             db_conn: Connection::open("./flight_database.db")?,
         };
 
@@ -25,7 +25,7 @@ impl FlightManager {
         match flight_manager.db_conn.execute(
             "CREATE TABLE wings (
                 wing_id     INTEGER PRIMARY KEY,
-                name        TEXT,
+                name        TEXT UNIQUE,
                 info        TEXT,
                 def         BOOLEAN
             );",
@@ -68,19 +68,15 @@ impl FlightManager {
         flight_manager.db_conn.execute(
             "CREATE TABLE IF NOT EXISTS flights (
                 flight_id   INTEGER PRIMARY KEY,
-                wing_id     INTEGER,
-                takeoff_id  INTEGER,
-                landing_id  INTEGER,
-                hash        BLOB,
+                wing_id     INTEGER REFERENCES wings(wing_id),
+                takeoff_id  INTEGER REFERENCES sites(site_id),
+                landing_id  INTEGER REFERENCES sites(site_id),
+                hash        BLOB UNIQUE,
                 date        DATE NOT NULL,
                 duration    INTEGER,
                 distance    INTEGER,
                 points      BLOB,
-                igc         BLOB,
-                UNIQUE(hash),
-                FOREIGN KEY(takeoff_id) REFERENCES sites(site_id),
-                FOREIGN KEY(landing_id) REFERENCES sites(site_id),
-                FOREIGN KEY(wing_id) REFERENCES wings(wing_id)
+                igc         BLOB
             );",
             (), // empty list of parameters.
         )?;
@@ -88,8 +84,7 @@ impl FlightManager {
         flight_manager.db_conn.execute(
             "CREATE TABLE IF NOT EXISTS tags (
                 tag_id      INTEGER PRIMARY KEY,
-                name        TEXT,
-                UNIQUE(name)
+                name        TEXT UNIQUE
             );",
             (), // empty list of parameters.
         )?;
@@ -97,10 +92,8 @@ impl FlightManager {
         flight_manager.db_conn.execute(
             "CREATE TABLE IF NOT EXISTS tag_asso (
                 join_id     INTEGER PRIMARY KEY,
-                tag_id      INTEGER,
-                flight_id   INTEGER,
-                FOREIGN KEY(tag_id) REFERENCES tags(tag_id),
-                FOREIGN KEY(flight_id) REFERENCES flights(flight_id)
+                tag_id      INTEGER REFERENCES tags(tag_id),
+                flight_id   INTEGER REFERENCES flights(flight_id) 
             );",
             (), // empty list of parameters.
         )?;
@@ -260,30 +253,7 @@ impl FlightManager {
         str_tags_ids.pop();//remove last ','
         str_tags_ids.push(')');
 
-        let sql = format!("SELECT flight_id FROM tag_asso WHERE tag_id IN {};",str_tags_ids);
-
-        let mut stmt = self.db_conn.prepare(&sql)?;
-
-        let rows = stmt
-            .query_map([], |row| {
-                Ok(row.get(0).unwrap_or(0))
-            })?;
-
-        let mut str_flight_ids = "(".to_string();
-
-        for id in rows
-        {
-            if let Ok(f) = id
-            {
-                str_flight_ids.push_str(format!("{},",f).as_str());
-            }
-            
-        }
-
-        str_flight_ids.pop();//remove last ','
-        str_flight_ids.push(')');
-
-        let sql = format!("SELECT flight_id, date, duration, distance, takeoff_id, landing_id FROM flights WHERE flight_id IN {};",str_flight_ids);
+        let sql = format!("SELECT flights.flight_id, date, duration, distance, takeoff_id, landing_id FROM flights INNER JOIN tag_asso WHERE flights.flight_id=tag_asso.flight_id AND tag_id IN {};",str_tags_ids);
 
         let mut stmt = self.db_conn.prepare(&sql)?;
 
@@ -448,14 +418,18 @@ impl FlightManager {
     pub fn store_wing(&self, wing: Wing)  -> Result<()>
     {
         self.db_conn.execute(
-        "INSERT OR IGNORE INTO wings (name, info, def)
-            VALUES (?1, ?2, ?3)",
+        "INSERT OR IGNORE INTO wings (name, info)
+            VALUES (?1, ?2)",
             (
-                wing.name,
+                wing.name.clone(),
                 wing.info,
-                wing.default,
             ),
         )?;
+
+        if wing.default.unwrap_or(false)
+        {
+            self.set_default_wing(None,Some(wing.name))?;
+        }
 
         Ok(())
     }
@@ -504,6 +478,32 @@ impl FlightManager {
         Ok(wings)
     }
 
+    pub fn get_wing(&self, id: Option<u32>, name: Option<String>) -> Result<Wing>
+    {
+        if let Some(i) = id
+        {
+            let mut stmt = self.db_conn.prepare("SELECT * FROM wings WHERE wing_id=?1")?;
+            let wing = stmt.query_row([i], |row| Ok(Wing{
+                id: row.get(0).unwrap_or(0),
+                name: row.get(1).unwrap_or("".to_string()),
+                info: row.get(2).unwrap_or("".to_string()),
+                default: row.get(3).unwrap_or(None),
+            }))?;
+            return Ok(wing);
+        }else if let Some(n) = name {
+            let mut stmt = self.db_conn.prepare("SELECT * FROM wings WHERE name=?1")?;
+            let wing = stmt.query_row([n], |row| Ok(Wing{
+                id: row.get(0).unwrap_or(0),
+                name: row.get(1).unwrap_or("".to_string()),
+                info: row.get(2).unwrap_or("".to_string()),
+                default: row.get(3).unwrap_or(None),
+            }))?;
+            return Ok(wing);
+        }
+    
+        bail!("Paramters error");
+    }
+
     pub fn delete_wing(&self, id: i32) -> Result<()>
     {
         self
@@ -513,11 +513,17 @@ impl FlightManager {
         Ok(())
     }
 
-    pub fn set_default_wing(&self, id:i32) -> Result<()>
+    pub fn set_default_wing(&self, id:Option<i32>, name: Option<String>) -> Result<()>
     {
         self.db_conn.execute("UPDATE wings SET def=?1 WHERE def=?2", [0,1])?;
 
-        self.db_conn.execute("UPDATE wings SET def=?1 WHERE wing_id=?2", [1,id])?;
+        if let Some(i) = id
+        {
+            self.db_conn.execute("UPDATE wings SET def=?1 WHERE wing_id=?2", (true,i))?;
+        }else if let Some(n) = name{
+            self.db_conn.execute("UPDATE wings SET def=?1 WHERE name=?2", (true,n))?;
+        }
+        
 
         Ok(())
     }
@@ -554,26 +560,28 @@ impl FlightManager {
 
         if name.is_some()
         {
-            sql.push_str(format!("name={} ",name.unwrap()).as_str());
+            sql.push_str(format!("name='{}',",name.unwrap()).as_str());
         }
         if lat.is_some()
         {
-            sql.push_str(format!("lat={} ",lat.unwrap()).as_str());
+            sql.push_str(format!("lat={},",lat.unwrap()).as_str());
         }
         if long.is_some()
         {
-            sql.push_str(format!("long={} ",long.unwrap()).as_str());
+            sql.push_str(format!("long={},",long.unwrap()).as_str());
         }
         if alt.is_some()
         {
-            sql.push_str(format!("alt={} ",alt.unwrap()).as_str());
+            sql.push_str(format!("alt={},",alt.unwrap()).as_str());
         }
         if info.is_some()
         {
-            sql.push_str(format!("info={} ",info.unwrap()).as_str());
+            sql.push_str(format!("info='{}',",info.unwrap()).as_str());
         }
 
-        sql.push_str("WHERE site_id=?2");
+        sql.pop();//Remove ','
+
+        sql.push_str("WHERE site_id=?1");
         
         self.db_conn.execute(&sql, [id])?;
 
@@ -618,7 +626,7 @@ impl FlightManager {
     pub fn associate_tag(&self, tag_id: u32, flight_id: u32) -> Result<()>
     {
         self.db_conn.execute(
-            "INSERT OR IGNORE INTO join (tag_id, flight_id)
+            "INSERT OR IGNORE INTO tag_asso (tag_id, flight_id)
                 VALUES (?1, ?2)",
                 (
                     tag_id,

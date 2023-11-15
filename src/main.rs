@@ -77,21 +77,54 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use crate::flight_manager::FlightManager;
+    use crate::flight_manager::{FlightManager, flight_data::{Wing, Tag, Statistic}};
 
     #[test]
-    fn test() {
+    fn add_flight_site_wing_tag() {
         let flightmanager: FlightManager = FlightManager::new().unwrap();
-        let flights = flightmanager.load_traces(Path::new("./test.igc"));
+        let mut flights = flightmanager.load_traces(Path::new("./test.igc"));
         assert_eq!(flights.len(), 1);
-        flightmanager.store_flights(flights).unwrap();
-    }
 
-    #[test]
-    fn test1() {
-        let flightmanager: FlightManager = FlightManager::new().unwrap();
+        flightmanager.edit_site(flights[0].takeoff.unwrap(), Some("Bisanne".to_string()), None, None, None, Some("Best place".to_string())).unwrap();
+
+        let wing = Wing{
+            id: 0,
+            name: "Supair Savage".to_string(),
+            info: "".to_string(),
+            default: Some(true),
+        };
+        flightmanager.store_wing(wing).unwrap();
+
+        let wing = flightmanager.get_wing(None, Some("Supair Savage".to_string())).unwrap();
+        assert_eq!(wing.id, 1);
+        flights[0].wing = wing.id;
+
+        flightmanager.store_flights(flights).unwrap();
+
         let flights = flightmanager.load_traces(Path::new("./test1.igc"));
         assert_eq!(flights.len(), 1);
         flightmanager.store_flights(flights).unwrap();
+
+        let tag = Tag
+        {
+            id:0,
+            name: "Cross".to_string(),
+        };
+        flightmanager.store_tag(tag).unwrap();
+
+        flightmanager.associate_tag(1, 2).unwrap();
+
+        let flights = flightmanager.get_flights_by_tags("cr".to_string()).unwrap();
+        assert_eq!(flights.len(), 1);
+        assert_eq!(flights[0].id, Some(2));
+
+        let flights = flightmanager.get_flights_by_sites("an".to_string()).unwrap();
+        assert_eq!(flights.len(), 1);
+        assert_eq!(flights[0].id, Some(1));
+
+        let flights = flightmanager.flights_history(None, None).unwrap();
+        dbg!(flights.statistic());
+
+
     }
 }
