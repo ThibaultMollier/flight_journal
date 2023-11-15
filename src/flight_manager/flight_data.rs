@@ -2,7 +2,6 @@ use chrono::NaiveDate;
 use geoutils::Location;
 use std::{fs, path::Path};
 use self::trace_manager::{FlightPoint, FlightTrace};
-use std::io::Write;
 use super::FlightManager;
 use anyhow::{Result, bail};
 
@@ -192,16 +191,5 @@ impl FlightCompute for FlightManager {
         }
 
         return Ok((res_takeoff,res_landing));
-    }
-}
-
-
-fn _to_file(trace: &Vec<FlightPoint>) {
-    let path = "./trace";
-
-    let mut output = fs::File::create(path).unwrap();
-
-    for pt in trace {
-        writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
     }
 }

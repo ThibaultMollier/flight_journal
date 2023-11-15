@@ -391,14 +391,14 @@ impl FlightManager {
                         "%Y-%m-%d",
                     )
                     .unwrap(),
-                    duration: row.get(6).unwrap_or(0),
+                    duration: row.get(6)?,
                     distance: row.get(7).unwrap_or(0),
                     takeoff: row.get(2).unwrap_or(None),
                     landing: row.get(3).unwrap_or(None),
                     wing: row.get(1).unwrap_or(0),
                     points: None,
                     trace: Some(FlightTrace::new(
-                        row.get(10).unwrap_or("".to_string()).to_string(),
+                        row.get(9)?,
                     )),
                 })
             })?;

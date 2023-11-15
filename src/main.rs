@@ -1,7 +1,10 @@
 use clap::{arg, command};
 use flight_manager::flight_data::Statistic;
 use flight_manager::FlightManager;
+use flight_manager::flight_data::trace_manager::FlightPoint;
 use geoutils::Location;
+use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 
@@ -77,7 +80,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use crate::flight_manager::{FlightManager, flight_data::{Wing, Tag, Statistic}};
+    use crate::{flight_manager::{FlightManager, flight_data::{Wing, Tag, Statistic, trace_manager::FlightTrace}}, _to_file};
 
     #[test]
     fn add_flight_site_wing_tag() {
@@ -103,6 +106,7 @@ mod tests {
 
         let flights = flightmanager.load_traces(Path::new("./test1.igc"));
         assert_eq!(flights.len(), 1);
+        assert_ne!(flights[0].trace.clone().unwrap().raw_igc.len(),0);
         flightmanager.store_flights(flights).unwrap();
 
         let tag = Tag
@@ -125,6 +129,18 @@ mod tests {
         let flights = flightmanager.flights_history(None, None).unwrap();
         dbg!(flights.statistic());
 
+        let _f = flightmanager.get_flights_by_id(2).unwrap();
+        // let points = FlightTrace::triangle(&f.trace.unwrap().simplified_trace);
+        // _to_file(&points.0);
+    }
+}
 
+fn _to_file(trace: &Vec<FlightPoint>) {
+    let path = "./trace";
+
+    let mut output = fs::File::create(path).unwrap();
+
+    for pt in trace {
+        writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
     }
 }

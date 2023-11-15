@@ -14,7 +14,7 @@ const NB_POINT:usize = 15;
 const HSPEED_THR:f64 = 3.0;// m/s - 11km/h
 const VSPEED_THR:f64 = 0.6;// m/s
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FlightPoint {
     pub time: DateTime<Utc>,
     pub lat: f32,
@@ -56,7 +56,7 @@ impl FlightTrace {
         let takeoff_index = Self::flight_detection(&trace);
         let mut reversed_trace = trace.clone();
         reversed_trace.reverse();
-        let landing_index = trace.len() - Self::flight_detection(&reversed_trace) - 1;
+        let landing_index = (trace.len() - Self::flight_detection(&reversed_trace)).saturating_sub(1);
 
         FlightTrace {
             check,
@@ -268,6 +268,90 @@ impl FlightTrace {
 
         // dbg!(dmax);
         (vec![p1, p2, p3], dmax)
+    }
+
+    pub fn points(pointlist: &Vec<FlightPoint>) -> (Vec<FlightPoint>, f64) {
+        let mut index: usize = 0;
+        let mut dmax: f64 = 0.0;
+        let mut p1: FlightPoint = FlightPoint {
+            time: Utc.with_ymd_and_hms(0, 1, 1, 0, 0, 0).unwrap(),
+            lat: 0.0,
+            long: 0.0,
+            alt: 0,
+            alt_gps: 0,
+        };
+        let mut p2: FlightPoint = p1.clone();
+        let mut p3: FlightPoint = p1.clone();
+        let mut p4: FlightPoint = p1.clone();
+
+        if pointlist.len() < 2
+        {
+            return (vec![p1, p2, p3, p4], dmax);
+        }
+
+        for pt1 in pointlist {
+            index += 1;
+            let loc1 = Location::new(pt1.lat, pt1.long);
+            if index < (pointlist.len() - 1) {
+                for pt2 in pointlist.get(index..).unwrap() {
+                    let loc2 = Location::new(pt2.lat, pt2.long);
+                    let d1: f64 = loc1
+                        .distance_to(&loc2)
+                        .unwrap_or(Distance::from_meters(0))
+                        .meters();
+
+                    for pt3 in pointlist.get(index + 1..).unwrap() {
+                        let loc3 = Location::new(pt3.lat, pt3.long);
+                        let d2: f64 = loc2
+                            .distance_to(&loc3)
+                            .unwrap_or(Distance::from_meters(0))
+                            .meters();
+
+                        for pt4 in pointlist.get(index + 1..).unwrap()
+                        {
+                            let loc4 = Location::new(pt4.lat, pt4.long);
+                            if loc1.distance_to(&loc4).unwrap().meters() < 3000.0
+                            {
+                                let d3: f64 = loc3
+                                .distance_to(&loc1)
+                                .unwrap_or(Distance::from_meters(0))
+                                .meters();
+
+                                if (d1 + d2 + d3) > dmax {
+                                    dmax = d1 + d2 + d3;
+                                    p1 = pt1.clone();
+                                    p2 = pt2.clone();
+                                    p3 = pt3.clone();
+                                    p4 = pt3.clone();
+                                }
+                            }else {
+                                let d3: f64 = loc3
+                                .distance_to(&loc4)
+                                .unwrap_or(Distance::from_meters(0))
+                                .meters();
+
+                                if (d1 + d2 + d3) > dmax {
+                                    dmax = d1 + d2 + d3;
+                                    p1 = pt1.clone();
+                                    p2 = pt2.clone();
+                                    p3 = pt3.clone();
+                                    p4 = pt4.clone();
+                                }
+                            }
+                            
+                        }
+                    }
+                }
+            }
+        }
+
+        // dbg!(dmax);
+        if p4 == p3 
+        {
+            (vec![p1, p2, p3], dmax)
+        }else{
+            (vec![p1, p2, p3, p4], dmax)
+        }
     }
 
     fn _simplify(pointlist: &Vec<FlightPoint>,n: u32) -> Vec<FlightPoint>
