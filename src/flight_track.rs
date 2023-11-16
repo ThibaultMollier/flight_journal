@@ -1,10 +1,15 @@
+use std::{process::{Command, Stdio}, io::Write};
+
 use crate::logbook::FlightPoint;
 use self::igc_reader::IgcReader;
 use anyhow::{Result, bail};
 use chrono::NaiveDate;
 use geoutils::{Location, Distance};
+use serde_json::Value;
 
 mod igc_reader;
+
+const IGC_SCORER_PATH: &str = "./igc-xc-score.exe";
 
 const EPSILON: f32 = 0.005;
 
@@ -14,8 +19,9 @@ const VSPEED_THR:f64 = 0.6;// m/s
 
 pub struct FlightTrack
 {
-    track: Vec<FlightPoint>,
-    simplified_track: Vec<FlightPoint>,
+    // track: Vec<FlightPoint>,
+    // simplified_track: Vec<FlightPoint>,
+    pub geojson: String,
     pub duration: u32,
     pub distance: u32,
     pub date: NaiveDate,
@@ -27,6 +33,21 @@ pub struct FlightTrack
 impl FlightTrack {
     pub fn new(raw_igc: &String) -> Result<Self>
     {
+        let mut igc_scorer = Command::new(IGC_SCORER_PATH)
+            .arg("pipe=true")
+            .arg("quiet=true")
+            .arg("maxtime=5")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        let temp = raw_igc.clone();
+
+        let mut stdin = igc_scorer.stdin.take().expect("Failed to open stdin");
+        std::thread::spawn(move || {
+                stdin.write_all(temp.as_bytes()).expect("failed to write to stdin");
+        });
+
         let igc = IgcReader::read(raw_igc)?;
 
         let takeoff_index = Self::flight_detection(&igc.track);
@@ -36,15 +57,29 @@ impl FlightTrack {
 
         let duration = igc.track[landing_index].time - igc.track[takeoff_index].time;
 
-        let simplified_track: Vec<FlightPoint> = Self::simplify(&igc.track[takeoff_index..landing_index].to_vec(), &EPSILON);
+        // let simplified_track: Vec<FlightPoint> = Self::simplify(&igc.track[takeoff_index..landing_index].to_vec(), &EPSILON);
+        // let distance: u32 = Self::total_distance(&simplified_track);
 
-        let distance: u32 = Self::total_distance(&simplified_track);
+        let output = igc_scorer.wait_with_output().expect("Failed to read stdout");
+        let geojson: Value = serde_json::from_slice(&output.stdout).unwrap();
+
+        let code = geojson["properties"]["code"].to_string();
+
+        let multiplier = if code == "\"tri\""{
+            1.2
+        }else if code == "\"fai\""
+        {
+            1.4
+        }else{
+            1.0
+        };
+
+        let distance = geojson["properties"]["score"].as_f64().unwrap()/multiplier;
 
         Ok(FlightTrack { 
-            track: igc.track.clone(), 
-            simplified_track, 
+            geojson: geojson.to_string(),
             duration: duration.num_minutes() as u32,
-            distance, 
+            distance: (distance*1000.0) as u32, 
             date: igc.date, 
             takeoff: igc.track[takeoff_index].clone(),
             landing: igc.track[landing_index].clone(),

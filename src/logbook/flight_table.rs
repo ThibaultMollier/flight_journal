@@ -14,7 +14,7 @@ pub struct FlightTable{
     pub date        :NaiveDate,
     pub duration    :u32,
     pub distance    :u32,
-    pub points      :Option<Vec<FlightPoint>>,
+    pub track       :Option<String>,
     pub raw_igc     :Option<String>
 }
 
@@ -34,7 +34,7 @@ impl FlightTable {
                 date        DATE NOT NULL,
                 duration    INTEGER,
                 distance    INTEGER,
-                points      BLOB,
+                track       BLOB,
                 igc         BLOB
             );",
             (), // empty list of parameters.
@@ -47,7 +47,7 @@ impl FlightTable {
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
         db_conn.execute(
-            "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, points, igc)
+            "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, track, igc)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 (
                     flight.hash,
@@ -57,7 +57,7 @@ impl FlightTable {
                     flight.takeoff_id,
                     flight.landing_id,
                     flight.wing_id,
-                    "",
+                    flight.track,
                     flight.raw_igc,
                 ),
             )?;
@@ -69,7 +69,7 @@ impl FlightTable {
     pub fn get(id: u32) -> Result<FlightTable>
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
-        let mut stmt: rusqlite::Statement<'_> = db_conn.prepare("SELECT * FROM flights WHERE flight_id=?1")?;
+        let mut stmt: rusqlite::Statement<'_> = db_conn.prepare("SELECT flight_id, wing_id, takeoff_id, landing_id, date, duration, distance, track FROM flights WHERE flight_id=?1")?;
 
         let flight = stmt
             .query_row([id], |row| {
@@ -78,12 +78,12 @@ impl FlightTable {
                     wing_id: row.get(1)?,
                     takeoff_id: row.get(2)?,
                     landing_id: row.get(3)?,
-                    hash: row.get(4)?,
-                    date: NaiveDate::parse_from_str(&row.get::<usize, String>(5)?, "%Y-%m-%d").unwrap_or_default(),
-                    duration: row.get(6)?,
-                    distance: row.get(7)?,
-                    points: None,
-                    raw_igc: row.get(9)?,
+                    hash: "".to_string(),
+                    date: NaiveDate::parse_from_str(&row.get::<usize, String>(4)?, "%Y-%m-%d").unwrap_or_default(),
+                    duration: row.get(5)?,
+                    distance: row.get(6)?,
+                    track: row.get(7)?,
+                    raw_igc: None,
                 })
             })?;
 
@@ -136,7 +136,7 @@ impl FlightTable {
                     date: NaiveDate::parse_from_str(&row.get::<usize, String>(3)?, "%Y-%m-%d").unwrap_or_default(),
                     duration: row.get(4)?,
                     distance: row.get(5)?,
-                    points: None,
+                    track: None,
                     raw_igc: None,
                 })
             })?;
@@ -173,7 +173,7 @@ impl FlightTable {
                     date: NaiveDate::parse_from_str(&row.get::<usize, String>(3)?, "%Y-%m-%d").unwrap_or_default(),
                     duration: row.get(4)?,
                     distance: row.get(5)?,
-                    points: None,
+                    track: None,
                     raw_igc: None,
                 })
             })?;

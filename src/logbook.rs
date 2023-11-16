@@ -98,79 +98,90 @@ impl Logbook {
         Ok(())
     }
 
-    pub fn load(path: &Path) -> Result<Vec<FlightTable>>
+    pub fn load_and_store(path: &Path) -> Result<()>
     {
         let paths: &mut Vec<String> = &mut Vec::new();
         Self::search_igc(path, paths);
-        let flights = &mut Vec::new();
 
         for path in paths 
         {
-            let raw_igc: String = fs::read_to_string(path)?;
-            match FlightTrack::new(&raw_igc)
-            {
-                Ok(t) => {
-                    let sites = SiteTable::site_detection(t.takeoff, t.landing)?;
-                    let wing = WingTable::get_default_wing()?;
 
-                    let takeoff = match sites.0 {
-                        None => 
-                        {
-                            let site = SiteTable { 
-                                site_id:0,
-                                name: "Unkown".to_string(),
-                                lat: t.takeoff.lat,
-                                long: t.takeoff.long,
-                                alt: t.takeoff.alt,
-                                info: "".to_string(),
-                            };
-                            SiteTable::store(site)?;
-            
-                            Some(SiteTable::last_site_id()?)
-                        },
-                        Some(s) => Some(s.site_id),
-                    };
-
-                    let landing = match sites.1 {
-                        None => 
-                        {
-                            let site = SiteTable { 
-                                site_id:0,
-                                name: "Unkown".to_string(),
-                                lat: t.landing.lat,
-                                long: t.landing.long,
-                                alt: t.landing.alt,
-                                info: "".to_string(),
-                            };
-                            SiteTable::store(site)?;
-            
-                            Some(SiteTable::last_site_id()?)
-                        },
-                        Some(s) => Some(s.site_id),
-                    };
-
-                    flights.push(FlightTable { 
-                        flight_id: 0, 
-                        wing_id: wing.wing_id, 
-                        takeoff_id: takeoff.unwrap_or(0), 
-                        landing_id: landing.unwrap_or(0), 
-                        hash: t.hash, 
-                        date: t.date, 
-                        duration: t.duration, 
-                        distance: t.distance, 
-                        points: None, 
-                        raw_igc: Some(raw_igc)
-                    });
-
-                },
-                Err(e) => {
-                    dbg!(e.to_string());
-                },
-            }            
+            let flight = Logbook::load(Path::new(path))?;
+            FlightTable::store(flight)?;
         }
 
-        Ok(flights.to_vec())
+        Ok(())
+    }
 
+    pub fn load(path: &Path) -> Result<FlightTable>
+    {
+        let raw_igc: String = fs::read_to_string(path)?;
+        let mut flight: Option<FlightTable> = None;
+        match FlightTrack::new(&raw_igc)
+        {
+            Ok(t) => {
+                let sites = SiteTable::site_detection(t.takeoff, t.landing)?;
+                let wing = WingTable::get_default_wing()?;
+
+                let takeoff = match sites.0 {
+                    None => 
+                    {
+                        let site = SiteTable { 
+                            site_id:0,
+                            name: "Unkown".to_string(),
+                            lat: t.takeoff.lat,
+                            long: t.takeoff.long,
+                            alt: t.takeoff.alt,
+                            info: "".to_string(),
+                        };
+                        SiteTable::store(site)?;
+        
+                        Some(SiteTable::last_site_id()?)
+                    },
+                    Some(s) => Some(s.site_id),
+                };
+
+                let landing = match sites.1 {
+                    None => 
+                    {
+                        let site = SiteTable { 
+                            site_id:0,
+                            name: "Unkown".to_string(),
+                            lat: t.landing.lat,
+                            long: t.landing.long,
+                            alt: t.landing.alt,
+                            info: "".to_string(),
+                        };
+                        SiteTable::store(site)?;
+        
+                        Some(SiteTable::last_site_id()?)
+                    },
+                    Some(s) => Some(s.site_id),
+                };
+
+                flight = Some(FlightTable { 
+                                    flight_id: 0, 
+                                    wing_id: wing.wing_id, 
+                                    takeoff_id: takeoff.unwrap_or(0), 
+                                    landing_id: landing.unwrap_or(0), 
+                                    hash: t.hash, 
+                                    date: t.date, 
+                                    duration: t.duration, 
+                                    distance: t.distance, 
+                                    track: Some(t.geojson), 
+                                    raw_igc: Some(raw_igc)
+                                });
+
+            },
+            Err(e) => {
+                bail!(e.to_string());
+            },
+        }
+
+        match flight {
+            Some(f) => Ok(f),
+            None => bail!("No flight"),
+        }
     }
 
     fn search_igc(path: &Path, output: &mut Vec<String>)

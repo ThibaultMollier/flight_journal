@@ -1,6 +1,6 @@
 use clap::{arg, command};
 use logbook::FlightPoint;
-use std::fs;
+use std::{fs, path};
 use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
@@ -24,12 +24,9 @@ fn main() {
     Logbook::create().unwrap();
 
     if let Some(s) = args.get_one::<String>("add") {
-        let flights = Logbook::load(Path::new(s)).unwrap();
-        println!("{} flights found",flights.len());
-        for flight in flights
-        {
-            FlightTable::store(flight).unwrap();
-        }
+
+        let path = Path::new(s);
+        Logbook::load_and_store(path).unwrap();
     }
 
     if args.get_flag("history") {
@@ -64,29 +61,21 @@ mod tests {
     fn add_flight_site_wing_tag() {
 
         Logbook::create().unwrap();
-        let mut flights = Logbook::load(Path::new("./test.igc")).unwrap();
-        assert_eq!(flights.len(), 1);
+        let mut flight = Logbook::load(Path::new("./test.igc")).unwrap();
 
-        SiteTable::update(format!("name='bisanne'"), format!("site_id={}",flights[0].takeoff_id)).unwrap();
+        SiteTable::update(format!("name='bisanne'"), format!("site_id={}",flight.takeoff_id)).unwrap();
 
         let wing = WingTable { wing_id: 0, name: "Supair Savage".to_string(), info: "Very cool".to_string(), def: true };
 
         WingTable::store(wing).unwrap();
 
-        flights[0].wing_id = WingTable::get_default_wing().unwrap().wing_id;
+        flight.wing_id = WingTable::get_default_wing().unwrap().wing_id;
 
-        for flight in flights
-        {
-            FlightTable::store(flight).unwrap();
-        }
+        FlightTable::store(flight).unwrap();
 
-        let flights = Logbook::load(Path::new("./test1.igc")).unwrap();
-        assert_eq!(flights.len(), 1);
+        let flight = Logbook::load(Path::new("./test1.igc")).unwrap();
 
-        for flight in flights
-        {
-            FlightTable::store(flight).unwrap();
-        }
+        FlightTable::store(flight).unwrap();
 
         let tag = TagTable{
             tag_id:0,
