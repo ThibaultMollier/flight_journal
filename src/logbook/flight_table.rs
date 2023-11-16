@@ -159,7 +159,7 @@ impl FlightTable {
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
         let mut fligths: Vec<FlightTable> = Vec::new();
-        let sql = format!("SELECT flight_id, date, duration, distance, takeoff_id, landing_id FROM flights INNER JOIN tag_asso WHERE flight_id=asso_flight_id AND tag_id IN {};",tag_ids.to_string());
+        let sql = format!("SELECT flight_id, takeoff_id, landing_id, date, duration, distance FROM flights INNER JOIN tag_asso WHERE flights.flight_id=asso_flight_id AND asso_tag_id IN {}",tag_ids.to_string());
         let mut stmt = db_conn.prepare(&sql)?;
 
         let rows = stmt
@@ -178,12 +178,19 @@ impl FlightTable {
                 })
             })?;
 
+
         for flight in rows {
+            // flight.unwrap();
             if let Ok(f) = flight {
                 fligths.push(f)
             }
         }
 
         Ok(fligths)
+    }
+
+    pub fn get_by_site(site_ids: IDListe) -> Result<Vec<FlightTable>>
+    {
+        FlightTable::select(format!("takeoff_id IN {} OR landing_id IN {}",site_ids.to_string(),site_ids.to_string(),))
     }
 }

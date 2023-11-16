@@ -35,7 +35,11 @@ fn main() {
     if args.get_flag("history") {
         let flights = FlightTable::select_all().unwrap();
         println!("{} flights found",flights.len());
-        dbg!(flights);
+
+        for flight in flights
+        {
+            println!("{} - {} - {} - {}",flight.flight_id,flight.date,flight.duration,flight.distance);
+        }
     }
 
     if let Some(i) = args.get_one::<String>("select") {
@@ -54,57 +58,55 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use crate::logbook::{Logbook, flight_table::FlightTable, site_table::SiteTable, wing_table::WingTable, tag_table::TagTable};
 
     #[test]
     fn add_flight_site_wing_tag() {
-        // let flightmanager: FlightManager = FlightManager::new().unwrap();
-        // let mut flights = flightmanager.load_traces(Path::new("./test.igc"));
-        // assert_eq!(flights.len(), 1);
 
-        // flightmanager.edit_site(flights[0].takeoff.unwrap(), Some("Bisanne".to_string()), None, None, None, Some("Best place".to_string())).unwrap();
+        Logbook::create().unwrap();
+        let mut flights = Logbook::load(Path::new("./test.igc")).unwrap();
+        assert_eq!(flights.len(), 1);
 
-        // let wing = Wing{
-        //     id: 0,
-        //     name: "Supair Savage".to_string(),
-        //     info: "".to_string(),
-        //     default: Some(true),
-        // };
-        // flightmanager.store_wing(wing).unwrap();
+        SiteTable::update(format!("name='bisanne'"), format!("site_id={}",flights[0].takeoff_id)).unwrap();
 
-        // let wing = flightmanager.get_wing(None, Some("Supair Savage".to_string())).unwrap();
-        // assert_eq!(wing.id, 1);
-        // flights[0].wing = wing.id;
+        let wing = WingTable { wing_id: 0, name: "Supair Savage".to_string(), info: "Very cool".to_string(), def: true };
 
-        // flightmanager.store_flights(flights).unwrap();
+        WingTable::store(wing).unwrap();
 
-        // let flights = flightmanager.load_traces(Path::new("./test1.igc"));
-        // assert_eq!(flights.len(), 1);
-        // assert_ne!(flights[0].trace.clone().unwrap().raw_igc.len(),0);
-        // flightmanager.store_flights(flights).unwrap();
+        flights[0].wing_id = WingTable::get_default_wing().unwrap().wing_id;
 
-        // let tag = Tag
-        // {
-        //     id:0,
-        //     name: "Cross".to_string(),
-        // };
-        // flightmanager.store_tag(tag).unwrap();
+        for flight in flights
+        {
+            FlightTable::store(flight).unwrap();
+        }
 
-        // flightmanager.associate_tag(1, 2).unwrap();
+        let flights = Logbook::load(Path::new("./test1.igc")).unwrap();
+        assert_eq!(flights.len(), 1);
 
-        // let flights = flightmanager.get_flights_by_tags("cr".to_string()).unwrap();
-        // assert_eq!(flights.len(), 1);
-        // assert_eq!(flights[0].id, Some(2));
+        for flight in flights
+        {
+            FlightTable::store(flight).unwrap();
+        }
 
-        // let flights = flightmanager.get_flights_by_sites("an".to_string()).unwrap();
-        // assert_eq!(flights.len(), 1);
-        // assert_eq!(flights[0].id, Some(1));
+        let tag = TagTable{
+            tag_id:0,
+            name: "Cross".to_string(),
+        };
+        TagTable::store(tag).unwrap();
 
-        // let flights = flightmanager.flights_history(None, None).unwrap();
-        // dbg!(flights.statistic());
+        TagTable::associate(2, 1).unwrap();
 
-        // let _f = flightmanager.get_flights_by_id(2).unwrap();
-        // // let points = FlightTrace::triangle(&f.trace.unwrap().simplified_trace);
-        // // _to_file(&points.0);
+        let tags = TagTable::search("cr".to_string()).unwrap();
+
+        let flights = FlightTable::get_by_tag(tags).unwrap();
+        assert_eq!(flights.len(), 1);
+        assert_eq!(flights[0].flight_id, 2);
+
+        let sites = SiteTable::search("an".to_string()).unwrap();
+
+        let flights = FlightTable::get_by_site(sites).unwrap();
+        assert_eq!(flights.len(), 1);
+        assert_eq!(flights[0].flight_id, 1);
     }
 }
 

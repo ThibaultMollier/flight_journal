@@ -12,6 +12,7 @@ pub mod wing_table;
 
 const DATABASE_PATH: &str = "./flight_database.db";
 
+#[derive(Debug)]
 pub struct IDListe
 {
     list: Vec<u32>,
@@ -26,7 +27,49 @@ pub struct FlightPoint{
     pub alt_gps: u32,
 }
 
+#[derive(Debug)]
+pub struct FlightStatistic {
+    pub duration: u32,
+    pub tot_distance: u32,
+    pub best_flight: Vec<FlightTable>,
+    pub nb_flight: u32,
+}
+
 pub struct Logbook;
+
+pub trait Statistic {
+    fn statistic(&self) -> FlightStatistic;
+}
+
+impl Statistic for Vec<FlightTable> {
+    fn statistic(&self) -> FlightStatistic {
+        let mut duration: u32 = 0;
+        let mut tot_distance: u32 = 0;
+        let mut nb_flight: u32 = 0;
+        let mut best_flight: Vec<FlightTable> = self.clone();
+
+        for flight in self {
+            duration += flight.duration;
+            tot_distance += flight.distance;
+            nb_flight += 1;
+        }
+
+        best_flight.sort_by(|a, b| b.distance.cmp(&a.distance));
+
+        let index = if best_flight.len() > 3 {
+            3
+        } else {
+            best_flight.len()
+        };
+
+        FlightStatistic {
+            duration,
+            tot_distance,
+            best_flight: best_flight[..index].to_vec(),
+            nb_flight,
+        }
+    }
+}
 
 impl ToString for IDListe {
     fn to_string(&self) -> String {       

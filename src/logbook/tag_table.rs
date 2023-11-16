@@ -6,8 +6,8 @@ use super::{DATABASE_PATH, IDListe};
 
 pub struct TagTable
 {
-    tag_id: u32,
-    name: String,
+    pub tag_id: u32,
+    pub name: String,
 }
 
 impl TagTable
@@ -42,7 +42,7 @@ impl TagTable
         let db_conn = Connection::open(DATABASE_PATH)?;
         db_conn.execute(
             "INSERT INTO tags (name)
-                VALUES (?1, ?2)",
+                VALUES (?1)",
                 (
                     tag.name,
                 ),
