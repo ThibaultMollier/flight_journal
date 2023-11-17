@@ -16,8 +16,9 @@ pub struct FlightTable{
     pub distance    :u32,
     pub score       :u32,
     pub code        :String,
-    pub track       :Option<String>,
-    pub raw_igc     :Option<String>
+    pub track       :Option<Vec<u8>>,
+    pub raw_igc     :Option<Vec<u8>>,
+    pub profile     :Option<Vec<u8>>,
 }
 
 impl FlightTable {
@@ -39,7 +40,8 @@ impl FlightTable {
                 score       INTERGER,
                 code        TEXT,
                 track       BLOB,
-                igc         BLOB
+                igc         BLOB,
+                profile     BLOB
             );",
             (), // empty list of parameters.
         )?;
@@ -51,19 +53,24 @@ impl FlightTable {
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
 
-        let track = match flight.track {
+        let track: Option<Vec<u8>> = match flight.track {
             None => None,
-            Some(t) => Some(zstd::encode_all(t.as_bytes(), 5)?)
+            Some(t) => Some(zstd::encode_all(t.as_slice(), 5)?)
         };
 
-        let igc = match flight.raw_igc {
+        let igc: Option<Vec<u8>> = match flight.raw_igc {
             None => None,
-            Some(i) => Some(zstd::encode_all(i.as_bytes(), 5)?)
+            Some(i) => Some(zstd::encode_all(i.as_slice(), 5)?)
+        };
+
+        let profile: Option<Vec<u8>> = match flight.profile {
+            None => None,
+            Some(p) => Some(zstd::encode_all(p.as_slice(), 5)?)
         };
 
         db_conn.execute(
-            "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, score, code, track, igc)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, score, code, track, igc, profile)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 (
                     flight.hash,
                     flight.date.format("%Y-%m-%d").to_string(),
@@ -76,6 +83,7 @@ impl FlightTable {
                     flight.code,
                     track,
                     igc,
+                    profile,
                 ),
             )?;
 
@@ -86,7 +94,7 @@ impl FlightTable {
     pub fn get(id: u32) -> Result<FlightTable>
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
-        let mut stmt: rusqlite::Statement<'_> = db_conn.prepare("SELECT flight_id, wing_id, takeoff_id, landing_id, date, duration, distance, score, code, track FROM flights WHERE flight_id=?1")?;
+        let mut stmt: rusqlite::Statement<'_> = db_conn.prepare("SELECT flight_id, wing_id, takeoff_id, landing_id, date, duration, distance, score, code, track, profile FROM flights WHERE flight_id=?1")?;
 
         let mut flight = stmt
             .query_row([id], |row| {
@@ -103,18 +111,28 @@ impl FlightTable {
                     code: row.get(8)?,
                     track: row.get(9)?,
                     raw_igc: None,
+                    profile: row.get(10)?,
                 })
             })?;
 
-        let decoded = match flight.track {
+        let decoded_track = match flight.track {
             None => None,
             Some(t) =>
             {
-                Some(String::from_utf8(zstd::decode_all(t.as_bytes()).unwrap()).unwrap())
+                Some(zstd::decode_all(t.as_slice()).unwrap())
             }
         };
 
-        flight.track = decoded;
+        let decoded_profile = match flight.profile {
+            None => None,
+            Some(p) =>
+            {
+                Some(zstd::decode_all(p.as_slice()).unwrap())
+            }
+        };
+
+        flight.profile = decoded_profile;         
+        flight.track = decoded_track;
 
         Ok(flight)
     }
@@ -169,6 +187,7 @@ impl FlightTable {
                     code: row.get(7)?,
                     track: None,
                     raw_igc: None,
+                    profile: None,
                 })
             })?;
 
@@ -183,7 +202,7 @@ impl FlightTable {
 
     pub fn select_all() -> Result<Vec<FlightTable>>
     {
-        FlightTable::select("1".to_string())
+        FlightTable::select("1 ORDER BY date DESC".to_string())
     }
 
     pub fn get_by_tag(tag_ids: IDListe) -> Result<Vec<FlightTable>>
@@ -208,6 +227,7 @@ impl FlightTable {
                     code: row.get(7)?,
                     track: None,
                     raw_igc: None,
+                    profile: None,
                 })
             })?;
 

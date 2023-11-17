@@ -1,31 +1,59 @@
-use std::{process::{Command, Stdio}, io::Write};
+use std::{io::Write, fs};
 
 use crate::logbook::FlightPoint;
 use self::igc_reader::IgcReader;
 use anyhow::{Result, bail};
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use geoutils::{Location, Distance};
-use serde_json::Value;
 
 mod igc_reader;
 
-const EPSILON: f32 = 0.005;
+const EPSILON: f32 = 0.00001;
 
 const NB_POINT:usize = 15;
 const HSPEED_THR:f64 = 3.0;// m/s - 11km/h
 const VSPEED_THR:f64 = 0.6;// m/s
+
+pub struct FlightProfile
+{
+    pub points: Vec<FlightProfilePoint>,
+}
+
+pub struct FlightProfilePoint
+{
+    time: NaiveDateTime,
+    alt: u32,
+    speed: u32, // m/s
+    vario: f32, // m/s
+}
 
 pub struct FlightTrack
 {
     // track: Vec<FlightPoint>,
     // simplified_track: Vec<FlightPoint>,
     // pub geojson: String,
+    pub profile: FlightProfile,
     pub duration: u32,
     pub distance: u32,
     pub date: NaiveDate,
     pub takeoff: FlightPoint,
     pub landing: FlightPoint,
     pub hash: String,
+}
+
+impl ToString for FlightProfile {
+    fn to_string(&self) -> String {
+        let mut csv = String::new();
+
+        dbg!(&self.points.len());
+
+        for pt in &self.points
+        {
+            csv.push_str(format!("{},{},{},{}\n",pt.time.timestamp(),pt.alt,pt.speed,pt.vario).as_str());
+        }
+
+        csv
+    }
 }
 
 impl FlightTrack {
@@ -43,7 +71,11 @@ impl FlightTrack {
         let simplified_track: Vec<FlightPoint> = Self::simplify(&igc.track[takeoff_index..landing_index].to_vec(), &EPSILON);
         let distance: u32 = Self::total_distance(&simplified_track);
 
+        Self::_to_file(&simplified_track);
+        println!("{} {}",simplified_track.len(),igc.track.len());
+
         Ok(FlightTrack { 
+            profile: Self::flight_profile(&simplified_track),
             duration: duration.num_minutes() as u32,
             distance, 
             date: igc.date, 
@@ -51,6 +83,25 @@ impl FlightTrack {
             landing: igc.track[landing_index].clone(),
             hash: igc.check
         })
+    }
+
+    fn flight_profile(trace: &Vec<FlightPoint>) -> FlightProfile
+    {
+        let mut profile: FlightProfile = FlightProfile { points: Vec::new() };
+
+        for i in 1..trace.len()
+        {
+            let delta = (trace[i].time - trace[i - 1].time).num_seconds() as u32;
+
+            let vario = (trace[i].alt as i32 - trace[i - 1].alt as i32) as f32 / delta as f32;
+            let pt1 = Location::new(trace[i].lat,trace[i].long);
+            let pt2 = Location::new(trace[i - 1].lat,trace[i - 1].long);
+
+            let speed = pt1.distance_to(&pt2).unwrap().meters() / delta as f64;
+            profile.points.push(FlightProfilePoint { time: trace[i].time, alt: trace[i].alt, speed: speed as u32, vario });
+        }
+
+        profile
     }
 
     fn flight_detection(trace: &Vec<FlightPoint>) -> usize {
@@ -189,4 +240,15 @@ impl FlightTrack {
 
         result
     }
+
+    fn _to_file(trace: &Vec<FlightPoint>) {
+        let path = "./trace";
+    
+        let mut output = fs::File::create(path).unwrap();
+    
+        for pt in trace {
+            writeln!(output, "{},{}", pt.lat, pt.long).unwrap();
+        }
+    }
 }
+

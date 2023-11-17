@@ -40,8 +40,14 @@ fn main() {
     }
 
     if let Some(i) = args.get_one::<String>("select") {
-        let flight = FlightTable::select(format!("flight_id={}",i)).unwrap();
-        println!("{} {}",flight[0].flight_id,flight[0].date);
+        let flight = FlightTable::get(i.parse::<u32>().unwrap()).unwrap();
+        // let flight = FlightTable::select(format!("flight_id={}",i)).unwrap();
+        println!("{} {}",flight.flight_id,flight.date);
+        
+        let mut output = fs::File::create("./profile.csv").unwrap();
+        write!(output,"{}",String::from_utf8(flight.profile.unwrap()).unwrap()).unwrap();
+        let mut output = fs::File::create("./flight.json").unwrap();
+        write!(output,"{}",String::from_utf8(flight.track.clone().unwrap()).unwrap()).unwrap();
     }
 
     if let Some(i) = args.get_one::<String>("delete") {
@@ -73,7 +79,7 @@ mod tests {
 
         let (track,score,code) = Logbook::get_score(scorer).unwrap();
 
-        flight.track = Some(track);
+        flight.track = Some(track.into());
         flight.score = score;
         flight.code = code;
 
@@ -83,7 +89,7 @@ mod tests {
 
         let (track,score,code) = Logbook::get_score(scorer).unwrap();
 
-        flight.track = Some(track);
+        flight.track = Some(track.into());
         flight.score = score;
         flight.code = code;
 

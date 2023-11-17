@@ -1,4 +1,4 @@
-use std::{path::Path, fs, process::{Command, Child, Stdio}, io::{Write, self}};
+use std::{path::Path, fs, process::{Command, Child, Stdio}, io::Write};
 use anyhow::{Result, bail};
 use chrono::NaiveDateTime;
 use serde_json::Value;
@@ -113,7 +113,7 @@ impl Logbook {
 
             let (track,score,code) = Logbook::get_score(scorer)?;
 
-            flight.track = Some(track);
+            flight.track = Some(track.into());
             flight.score = score;
             flight.code = code;
 
@@ -184,7 +184,8 @@ impl Logbook {
                                     score: 0,
                                     code: "".to_string(),
                                     track: None, 
-                                    raw_igc: Some(raw_igc)
+                                    raw_igc: Some(raw_igc.as_bytes().to_vec()),
+                                    profile: Some(t.profile.to_string().as_bytes().to_vec()),
                                 });
 
             },
