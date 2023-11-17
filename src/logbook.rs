@@ -1,6 +1,7 @@
-use std::{path::Path, fs};
+use std::{path::Path, fs, process::{Command, Child, Stdio}, io::{Write, self}};
 use anyhow::{Result, bail};
 use chrono::NaiveDateTime;
+use serde_json::Value;
 use crate::flight_track::FlightTrack;
 
 use self::{flight_table::FlightTable, site_table::SiteTable, tag_table::TagTable, wing_table::WingTable};
@@ -11,6 +12,8 @@ pub mod tag_table;
 pub mod wing_table;
 
 const DATABASE_PATH: &str = "./flight_database.db";
+const IGC_SCORER_PATH: &str = "./igc-xc-score.exe";
+const SCORE_MAX_TIME: &str = "maxtime=5";
 
 #[derive(Debug)]
 pub struct IDListe
@@ -106,17 +109,27 @@ impl Logbook {
         for path in paths 
         {
 
-            let flight = Logbook::load(Path::new(path))?;
+            let (mut flight,scorer) = Logbook::load(Path::new(path))?;
+
+            let (track,score,code) = Logbook::get_score(scorer)?;
+
+            flight.track = Some(track);
+            flight.score = score;
+            flight.code = code;
+
             FlightTable::store(flight)?;
         }
 
         Ok(())
     }
 
-    pub fn load(path: &Path) -> Result<FlightTable>
+    pub fn load(path: &Path) -> Result<(FlightTable,Child)>
     {
         let raw_igc: String = fs::read_to_string(path)?;
-        let mut flight: Option<FlightTable> = None;
+        let flight: Option<FlightTable>;
+
+        let scorer = Logbook::score(&raw_igc)?;
+
         match FlightTrack::new(&raw_igc)
         {
             Ok(t) => {
@@ -168,7 +181,9 @@ impl Logbook {
                                     date: t.date, 
                                     duration: t.duration, 
                                     distance: t.distance, 
-                                    track: Some(t.geojson), 
+                                    score: 0,
+                                    code: "".to_string(),
+                                    track: None, 
                                     raw_igc: Some(raw_igc)
                                 });
 
@@ -179,9 +194,40 @@ impl Logbook {
         }
 
         match flight {
-            Some(f) => Ok(f),
+            Some(f) => Ok((f,scorer)),
             None => bail!("No flight"),
         }
+    }
+
+    pub fn get_score(scorer: Child) -> Result<(String,u32,String)>
+    {
+        let output = scorer.wait_with_output()?;
+        let geojson: Value = serde_json::from_slice(&output.stdout)?;
+
+        let code = geojson["properties"]["code"].to_string();
+        let score = geojson["properties"]["score"].as_f64().unwrap();
+
+        Ok((geojson.to_string(),(score*1000.0) as u32, code))
+    }
+
+    fn score(raw_igc: &String) -> Result<Child>
+    {
+        let mut igc_scorer = Command::new(IGC_SCORER_PATH)
+            .arg("pipe=true")
+            .arg("quiet=true")
+            .arg(SCORE_MAX_TIME)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        let temp = raw_igc.clone();
+
+        let mut stdin = igc_scorer.stdin.take().expect("Failed to open stdin");
+        std::thread::spawn(move || {
+                stdin.write_all(temp.as_bytes()).expect("failed to write to stdin");
+        });
+
+        Ok(igc_scorer)
     }
 
     fn search_igc(path: &Path, output: &mut Vec<String>)

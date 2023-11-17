@@ -14,6 +14,8 @@ pub struct FlightTable{
     pub date        :NaiveDate,
     pub duration    :u32,
     pub distance    :u32,
+    pub score       :u32,
+    pub code        :String,
     pub track       :Option<String>,
     pub raw_igc     :Option<String>
 }
@@ -34,6 +36,8 @@ impl FlightTable {
                 date        DATE NOT NULL,
                 duration    INTEGER,
                 distance    INTEGER,
+                score       INTERGER,
+                code        TEXT,
                 track       BLOB,
                 igc         BLOB
             );",
@@ -46,9 +50,20 @@ impl FlightTable {
     pub fn store(flight: FlightTable) -> Result<()>
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
+
+        let track = match flight.track {
+            None => None,
+            Some(t) => Some(zstd::encode_all(t.as_bytes(), 5)?)
+        };
+
+        let igc = match flight.raw_igc {
+            None => None,
+            Some(i) => Some(zstd::encode_all(i.as_bytes(), 5)?)
+        };
+
         db_conn.execute(
-            "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, track, igc)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO flights (hash, date, duration, distance, takeoff_id, landing_id, wing_id, score, code, track, igc)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 (
                     flight.hash,
                     flight.date.format("%Y-%m-%d").to_string(),
@@ -57,8 +72,10 @@ impl FlightTable {
                     flight.takeoff_id,
                     flight.landing_id,
                     flight.wing_id,
-                    flight.track,
-                    flight.raw_igc,
+                    flight.score,
+                    flight.code,
+                    track,
+                    igc,
                 ),
             )?;
 
@@ -69,9 +86,9 @@ impl FlightTable {
     pub fn get(id: u32) -> Result<FlightTable>
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
-        let mut stmt: rusqlite::Statement<'_> = db_conn.prepare("SELECT flight_id, wing_id, takeoff_id, landing_id, date, duration, distance, track FROM flights WHERE flight_id=?1")?;
+        let mut stmt: rusqlite::Statement<'_> = db_conn.prepare("SELECT flight_id, wing_id, takeoff_id, landing_id, date, duration, distance, score, code, track FROM flights WHERE flight_id=?1")?;
 
-        let flight = stmt
+        let mut flight = stmt
             .query_row([id], |row| {
                 Ok(FlightTable {
                     flight_id: row.get(0)?,
@@ -82,10 +99,22 @@ impl FlightTable {
                     date: NaiveDate::parse_from_str(&row.get::<usize, String>(4)?, "%Y-%m-%d").unwrap_or_default(),
                     duration: row.get(5)?,
                     distance: row.get(6)?,
-                    track: row.get(7)?,
+                    score: row.get(7)?,
+                    code: row.get(8)?,
+                    track: row.get(9)?,
                     raw_igc: None,
                 })
             })?;
+
+        let decoded = match flight.track {
+            None => None,
+            Some(t) =>
+            {
+                Some(String::from_utf8(zstd::decode_all(t.as_bytes()).unwrap()).unwrap())
+            }
+        };
+
+        flight.track = decoded;
 
         Ok(flight)
     }
@@ -120,7 +149,7 @@ impl FlightTable {
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
         let mut fligths: Vec<FlightTable> = Vec::new();
-        let mut sql = "SELECT flight_id, takeoff_id, landing_id, date, duration, distance FROM flights WHERE ".to_string();
+        let mut sql = "SELECT flight_id, takeoff_id, landing_id, date, duration, distance, score, code FROM flights WHERE ".to_string();
         sql.push_str(&condition);
 
         let mut stmt = db_conn.prepare(&sql)?;
@@ -136,6 +165,8 @@ impl FlightTable {
                     date: NaiveDate::parse_from_str(&row.get::<usize, String>(3)?, "%Y-%m-%d").unwrap_or_default(),
                     duration: row.get(4)?,
                     distance: row.get(5)?,
+                    score: row.get(6)?,
+                    code: row.get(7)?,
                     track: None,
                     raw_igc: None,
                 })
@@ -159,7 +190,7 @@ impl FlightTable {
     {
         let db_conn = Connection::open(DATABASE_PATH)?;
         let mut fligths: Vec<FlightTable> = Vec::new();
-        let sql = format!("SELECT flight_id, takeoff_id, landing_id, date, duration, distance FROM flights INNER JOIN tag_asso WHERE flights.flight_id=asso_flight_id AND asso_tag_id IN {}",tag_ids.to_string());
+        let sql = format!("SELECT flight_id, takeoff_id, landing_id, date, duration, distance, score, code FROM flights INNER JOIN tag_asso WHERE flights.flight_id=asso_flight_id AND asso_tag_id IN {}",tag_ids.to_string());
         let mut stmt = db_conn.prepare(&sql)?;
 
         let rows = stmt
@@ -173,6 +204,8 @@ impl FlightTable {
                     date: NaiveDate::parse_from_str(&row.get::<usize, String>(3)?, "%Y-%m-%d").unwrap_or_default(),
                     duration: row.get(4)?,
                     distance: row.get(5)?,
+                    score: row.get(6)?,
+                    code: row.get(7)?,
                     track: None,
                     raw_igc: None,
                 })

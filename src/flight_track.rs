@@ -9,8 +9,6 @@ use serde_json::Value;
 
 mod igc_reader;
 
-const IGC_SCORER_PATH: &str = "./igc-xc-score.exe";
-
 const EPSILON: f32 = 0.005;
 
 const NB_POINT:usize = 15;
@@ -21,7 +19,7 @@ pub struct FlightTrack
 {
     // track: Vec<FlightPoint>,
     // simplified_track: Vec<FlightPoint>,
-    pub geojson: String,
+    // pub geojson: String,
     pub duration: u32,
     pub distance: u32,
     pub date: NaiveDate,
@@ -33,21 +31,6 @@ pub struct FlightTrack
 impl FlightTrack {
     pub fn new(raw_igc: &String) -> Result<Self>
     {
-        let mut igc_scorer = Command::new(IGC_SCORER_PATH)
-            .arg("pipe=true")
-            .arg("quiet=true")
-            .arg("maxtime=5")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()?;
-
-        let temp = raw_igc.clone();
-
-        let mut stdin = igc_scorer.stdin.take().expect("Failed to open stdin");
-        std::thread::spawn(move || {
-                stdin.write_all(temp.as_bytes()).expect("failed to write to stdin");
-        });
-
         let igc = IgcReader::read(raw_igc)?;
 
         let takeoff_index = Self::flight_detection(&igc.track);
@@ -57,29 +40,12 @@ impl FlightTrack {
 
         let duration = igc.track[landing_index].time - igc.track[takeoff_index].time;
 
-        // let simplified_track: Vec<FlightPoint> = Self::simplify(&igc.track[takeoff_index..landing_index].to_vec(), &EPSILON);
-        // let distance: u32 = Self::total_distance(&simplified_track);
-
-        let output = igc_scorer.wait_with_output().expect("Failed to read stdout");
-        let geojson: Value = serde_json::from_slice(&output.stdout).unwrap();
-
-        let code = geojson["properties"]["code"].to_string();
-
-        let multiplier = if code == "\"tri\""{
-            1.2
-        }else if code == "\"fai\""
-        {
-            1.4
-        }else{
-            1.0
-        };
-
-        let distance = geojson["properties"]["score"].as_f64().unwrap()/multiplier;
+        let simplified_track: Vec<FlightPoint> = Self::simplify(&igc.track[takeoff_index..landing_index].to_vec(), &EPSILON);
+        let distance: u32 = Self::total_distance(&simplified_track);
 
         Ok(FlightTrack { 
-            geojson: geojson.to_string(),
             duration: duration.num_minutes() as u32,
-            distance: (distance*1000.0) as u32, 
+            distance, 
             date: igc.date, 
             takeoff: igc.track[takeoff_index].clone(),
             landing: igc.track[landing_index].clone(),

@@ -35,7 +35,7 @@ fn main() {
 
         for flight in flights
         {
-            println!("{} - {} - {} - {}",flight.flight_id,flight.date,flight.duration,flight.distance);
+            println!("{} - {} - {:3}min - {:3}km - {:3}pts - {}",flight.flight_id,flight.date,flight.duration,flight.distance/1000,flight.score/1000, flight.code);
         }
     }
 
@@ -61,7 +61,7 @@ mod tests {
     fn add_flight_site_wing_tag() {
 
         Logbook::create().unwrap();
-        let mut flight = Logbook::load(Path::new("./test.igc")).unwrap();
+        let (mut flight,scorer) = Logbook::load(Path::new("./test.igc")).unwrap();
 
         SiteTable::update(format!("name='bisanne'"), format!("site_id={}",flight.takeoff_id)).unwrap();
 
@@ -71,9 +71,21 @@ mod tests {
 
         flight.wing_id = WingTable::get_default_wing().unwrap().wing_id;
 
+        let (track,score,code) = Logbook::get_score(scorer).unwrap();
+
+        flight.track = Some(track);
+        flight.score = score;
+        flight.code = code;
+
         FlightTable::store(flight).unwrap();
 
-        let flight = Logbook::load(Path::new("./test1.igc")).unwrap();
+        let (mut flight,scorer) = Logbook::load(Path::new("./test1.igc")).unwrap();
+
+        let (track,score,code) = Logbook::get_score(scorer).unwrap();
+
+        flight.track = Some(track);
+        flight.score = score;
+        flight.code = code;
 
         FlightTable::store(flight).unwrap();
 
