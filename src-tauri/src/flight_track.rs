@@ -44,13 +44,24 @@ pub struct FlightTrack
 impl ToString for FlightProfile {
     fn to_string(&self) -> String {
         let mut csv = String::new();
-
-        dbg!(&self.points.len());
+        let mut ts_col = String::new();
+        let mut alt_col = String::new();
+        let mut speed_col = String::new();
+        let mut vario_col = String::new();
 
         for pt in &self.points
         {
-            csv.push_str(format!("{},{},{},{}\n",pt.time.timestamp(),pt.alt,pt.speed,pt.vario).as_str());
+            ts_col.push_str(format!("{},",pt.time.timestamp()).as_str());
+            alt_col.push_str(format!("{},",pt.alt).as_str());
+            speed_col.push_str(format!("{},",pt.speed).as_str());
+            vario_col.push_str(format!("{},",pt.vario).as_str());
+            // csv.push_str(format!("{},{},{},{}\n",pt.time.timestamp(),pt.alt,pt.speed,pt.vario).as_str());
         }
+
+        csv.push_str(&ts_col);
+        csv.push_str(&alt_col);
+        csv.push_str(&speed_col);
+        csv.push_str(&vario_col);
 
         csv
     }

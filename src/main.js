@@ -54,6 +54,47 @@ function load_flght(flight)
   map.fitBounds(trace.getBounds());
   // map.setView([geojson.features[9].geometry.coordinates[1],geojson.features[9].geometry.coordinates[0]], 11);
   console.log(geojson);
+
+  let data = CSVToArray(flight.profile)
+
+  let graph = document.getElementById("graph_container");
+  let curve = document.getElementById("curve");
+  let xstep = graph.offsetWidth / data[1].length;
+  let ystep = graph.offsetHeight / (Math.ceil(Math.max(...data[1])/1000)*1000);
+  let curve_str = "M0.0,"+(graph.offsetHeight - data[1][0]*ystep);
+  
+  console.log(Math.max(...data[1]));
+  console.log(Math.ceil(Math.max(...data[1])/1000)*1000)
+
+  for (let index = 1; index < (data[1].length-1); index++) {
+    curve_str += "L" + index*xstep + "," + (graph.offsetHeight - data[1][index]*ystep);
+  }
+
+  curve.setAttribute("d",curve_str);
+  let axes = document.getElementById("axes");
+  let axe_str = "";
+
+  for (let alt = 1000; alt < Math.max(...data[1]); alt+=1000) {
+    axe_str += "M0," + (graph.offsetHeight -alt*ystep) +"H"+graph.offsetWidth ;
+  }
+  axes.setAttribute("d",axe_str);
+  
+
+  graph.addEventListener("mousemove", (event) => {
+    let i = Math.trunc(event.offsetX/xstep);
+    console.log(data[1][i]);
+    let cursor = document.getElementById("cursor");
+    cursor.setAttribute("d","M" + event.offsetX + ",0V" + graph.offsetHeight);
+
+    let text = document.getElementById("text");
+    text.setAttribute("x",event.offsetX);
+    text.setAttribute("y",(graph.offsetHeight - data[1][i]*ystep + 5));
+    text.textContent = data[1][i] +"m";
+    // cursor.parentNode.appendChild(text);
+
+    // document.getElementById("text").textContent = data[1][i] +"m";
+  });
+ 
 }
 
 // Tree list
@@ -137,3 +178,87 @@ function flight_select(evt) {
 window.addEventListener("DOMContentLoaded", () => {
 
 });
+
+
+
+function CSVToArray( strData, strDelimiter ){
+  // Check to see if the delimiter is defined. If not,
+  // then default to comma.
+  strDelimiter = (strDelimiter || ",");
+
+  // Create a regular expression to parse the CSV values.
+  var objPattern = new RegExp(
+    (
+      // Delimiters.
+      "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
+
+      // Quoted fields.
+      "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
+
+      // Standard fields.
+      "([^\"\\" + strDelimiter + "\\r\\n]*))"
+    ),
+    "gi"
+    );
+
+
+  // Create an array to hold our data. Give the array
+  // a default empty first row.
+  var arrData = [[]];
+
+  // Create an array to hold our individual pattern
+  // matching groups.
+  var arrMatches = null;
+
+
+  // Keep looping over the regular expression matches
+  // until we can no longer find a match.
+  while (arrMatches = objPattern.exec( strData )){
+
+    // Get the delimiter that was found.
+    var strMatchedDelimiter = arrMatches[ 1 ];
+
+    // Check to see if the given delimiter has a length
+    // (is not the start of string) and if it matches
+    // field delimiter. If id does not, then we know
+    // that this delimiter is a row delimiter.
+    if (
+      strMatchedDelimiter.length &&
+      (strMatchedDelimiter != strDelimiter)
+      ){
+
+      // Since we have reached a new row of data,
+      // add an empty row to our data array.
+      arrData.push( [] );
+
+    }
+
+
+    // Now that we have our delimiter out of the way,
+    // let's check to see which kind of value we
+    // captured (quoted or unquoted).
+    if (arrMatches[ 2 ]){
+
+      // We found a quoted value. When we capture
+      // this value, unescape any double quotes.
+      var strMatchedValue = arrMatches[ 2 ].replace(
+        new RegExp( "\"\"", "g" ),
+        "\""
+        );
+
+    } else {
+
+      // We found a non-quoted value.
+      var strMatchedValue = arrMatches[ 3 ];
+
+    }
+
+
+    // Now that we have our value string, let's add
+    // it to the data array.
+    arrData[ arrData.length - 1 ].push( strMatchedValue );
+  }
+
+  // Return the parsed data.
+  return( arrData );
+}

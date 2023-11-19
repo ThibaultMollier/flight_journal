@@ -14,6 +14,8 @@
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
      
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+     
   </head>
 
   <body>
@@ -24,6 +26,22 @@
     </div>
     <div id="right_zone">
       <div id="map"></div>
+      <div id="graph_container">
+        <svg width="100%" height="100%">
+          <rect width="100%" height="100%" fill="white"></rect>
+          <g stroke="#ff0000" fill="none">
+            <path id="curve"></path>
+          </g>
+          <g stroke="#7c7c7c" fill="none" opacity="0.4">
+            <path id="axes"></path>
+          </g>
+          <g stroke="#7c7c7c" opacity="1">
+            <path id="cursor"></path>
+            <text id="text"></text>
+          </g>
+          
+        </svg>
+      </div>
     </div>
   </body>
 </html>
