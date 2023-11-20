@@ -20,36 +20,27 @@
 
 body 
 { 
- height: 100vh; 
- width: 100vw;
- margin: 0; 
- padding: 0 ;
- position: relative;
- color: #3A00E5;
- overflow: hidden;
+  height: 100vh; 
+  width: 100vw;
+  display: grid;
+  grid-template-columns: 28rem 1fr;
+  grid-template-rows: 10rem 1fr 5rem 15rem;
+  margin: 0; 
+  padding: 0 ;
 }
 
-#left_zone{
-  margin: 0;
-  width: 30%;
-  height: 100%;
-  float: left;
-  background-color: #D9D9D9;
-}
-
-#left_zone #tree
+#head
 {
-  padding: 0;
-  height: 80%;
-  overflow-y:scroll;
+  grid-column: 1;
+  grid-row: 1;
 }
 
-#left_zone #tree li
+#tree
 {
-  height: 1.6rem;
-  padding-top: 0.4rem;
-  padding-left: 2rem;
-  display: flex;
+  grid-column: 1;
+  grid-row: 2 / 5;
+  overflow: hidden;
+  overflow-y: scroll;
 }
 
 li:hover
@@ -58,48 +49,54 @@ li:hover
   cursor: pointer;
 }
 
-#left_zone #tree li img
+#tree li
+{
+  display: flex;
+  gap: 0.25rem; 
+  padding: 0.3rem 0 0.3rem 1.5rem;
+}
+
+#tree li img
 {
   width: 1.2rem;
   height: 1.25rem;
+  margin-left: 0.5rem;
 }
 
-#left_zone #tree #selected
+#selected
 {
   background-color: #3A00E5;
   color: #ffffff;
 }
 
-#left_zone #tree #selected img
+#selected img
 {
   filter: brightness(0) invert(1);
 }
 
-#left_zone #tree div
+#map
 {
-  padding: 0 0.6rem;
+  grid-column: 2;
+  grid-row: 1 / 4;
+  z-index: 1;
 }
 
-#left_zone #head{
-  margin: 0;
-  height: 15%;
-  /* height: auto; */
+#data
+{
+  grid-column: 2;
+  grid-row: 3 / 5;
+  background-color: white;
+  display: grid;
+  opacity: 0.6;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 5rem 1fr;
+  z-index: 2;
 }
 
-#right_zone{
-  margin: 0;
-  width: 70%;
-  height: 100%;
-  float: left;
+#chart
+{
+  grid-column: 1 / 5;
+  grid-row: 2;
+  display: flex;
 }
 
-#map{
-  margin: 0;
-  width: 100%;
-  height: 80%;
-}
-
-#right_zone #graph_container{
-  height: auto;
-  width: 100%;
-}
