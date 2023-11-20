@@ -25,6 +25,8 @@ pub struct FlightProfilePoint
     alt: u32,
     speed: u32, // m/s
     vario: f32, // m/s
+    lat: f32,
+    lng: f32,
 }
 
 pub struct FlightTrack
@@ -48,6 +50,8 @@ impl ToString for FlightProfile {
         let mut alt_col = String::new();
         let mut speed_col = String::new();
         let mut vario_col = String::new();
+        let mut lat_col = String::new();
+        let mut lng_col = String::new();
 
         for pt in &self.points
         {
@@ -55,13 +59,24 @@ impl ToString for FlightProfile {
             alt_col.push_str(format!("{},",pt.alt).as_str());
             speed_col.push_str(format!("{},",pt.speed).as_str());
             vario_col.push_str(format!("{},",pt.vario).as_str());
+            lat_col.push_str(format!("{},",pt.lat).as_str());
+            lng_col.push_str(format!("{},",pt.lng).as_str());
             // csv.push_str(format!("{},{},{},{}\n",pt.time.timestamp(),pt.alt,pt.speed,pt.vario).as_str());
         }
+
+        ts_col.push_str("\n");
+        alt_col.push_str("\n");
+        speed_col.push_str("\n");
+        vario_col.push_str("\n");
+        lat_col.push_str("\n");
+        lng_col.push_str("\n");
 
         csv.push_str(&ts_col);
         csv.push_str(&alt_col);
         csv.push_str(&speed_col);
         csv.push_str(&vario_col);
+        csv.push_str(&lat_col);
+        csv.push_str(&lng_col);
 
         csv
     }
@@ -109,7 +124,14 @@ impl FlightTrack {
             let pt2 = Location::new(trace[i - 1].lat,trace[i - 1].long);
 
             let speed = pt1.distance_to(&pt2).unwrap().meters() / delta as f64;
-            profile.points.push(FlightProfilePoint { time: trace[i].time, alt: trace[i].alt, speed: speed as u32, vario });
+            profile.points.push(FlightProfilePoint { 
+                time: trace[i].time, 
+                alt: trace[i].alt, 
+                speed: speed as u32, 
+                vario,
+                lat: pt1.latitude() as f32,
+                lng: pt1.longitude() as f32,
+            });
         }
 
         profile

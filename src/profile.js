@@ -11,16 +11,17 @@ class Profile
 
     draw(profile)
     {
-        let data = CSVToArray(profile);        
+        this.data = CSVToArray(profile);
+        console.log(this.data[1][1]);        
       
         let path = document.createElementNS('http://www.w3.org/2000/svg',"path");
-        let maxalt = Math.max(...data[1]);
-        this.xstep = this.graph.offsetWidth / data[1].length;
+        let maxalt = Math.max(...this.data[1]);
+        this.xstep = this.graph.offsetWidth / this.data[1].length;
         this.ystep = this.graph.offsetHeight / (Math.ceil(maxalt/1000)*1000);
-        let curve_str = "M0.0," + (this.graph.offsetHeight - data[1][0]*this.ystep);
+        let curve_str = "M0.0," + (this.graph.offsetHeight - this.data[1][0]*this.ystep);
       
-        for (let index = 1; index < (data[1].length-1); index++) {
-          curve_str += "L" + index*this.xstep + "," + (this.graph.offsetHeight - data[1][index]*this.ystep);
+        for (let index = 1; index < (this.data[1].length-1); index++) {
+          curve_str += "L" + index*this.xstep + "," + (this.graph.offsetHeight - this.data[1][index]*this.ystep);
         }
       
         path.setAttribute("d",curve_str);
@@ -58,11 +59,12 @@ class Profile
         this.svg.appendChild(axes);        
     }
 
-    listen()
+    listen(callback)
     {
         this.graph.addEventListener("mousemove", (event) => {
             let i = Math.trunc(event.offsetX/this.xstep);
             this.cursor.setAttribute("d","M" + event.offsetX + ",0V" + this.graph.offsetHeight);
+            callback(this.data[4][i],this.data[5][i])
         });
     }
 
@@ -90,7 +92,7 @@ function CSVToArray( strData, strDelimiter ){
         );
 
 
-    // Create an array to hold our data. Give the array
+    // Create an array to hold our this.data. Give the array
     // a default empty first row.
     var arrData = [[]];
 
@@ -115,8 +117,8 @@ function CSVToArray( strData, strDelimiter ){
         (strMatchedDelimiter != strDelimiter)
         ){
 
-        // Since we have reached a new row of data,
-        // add an empty row to our data array.
+        // Since we have reached a new row of this.data,
+        // add an empty row to our this.data array.
         arrData.push( [] );
 
         }
@@ -143,10 +145,10 @@ function CSVToArray( strData, strDelimiter ){
 
 
         // Now that we have our value string, let's add
-        // it to the data array.
+        // it to the this.data array.
         arrData[ arrData.length - 1 ].push( strMatchedValue );
     }
 
-    // Return the parsed data.
+    // Return the parsed this.data.
     return( arrData );
 }

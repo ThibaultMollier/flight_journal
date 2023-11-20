@@ -4,6 +4,7 @@ const { invoke } = window.__TAURI__.tauri;
 
 var map = L.map('map').setView([45.5, 6.2], 10);
 let trace = L.geoJSON().addTo(map);
+let marker = L.marker([0,0]).addTo(map);
 
 // L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 //     maxZoom: 19,
@@ -18,6 +19,7 @@ L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
 
 function load_flght(flight)
 {
+  marker.setLatLng([0, 0]);
   trace.remove();
   let geojson = JSON.parse(flight.track);
   trace = L.geoJSON(geojson, {
@@ -55,9 +57,11 @@ function load_flght(flight)
   // map.setView([geojson.features[9].geometry.coordinates[1],geojson.features[9].geometry.coordinates[0]], 11);
 
   let profile = new Profile();
-
   profile.draw(flight.profile);
-  profile.listen();
+  profile.listen((lat,lng) => {
+    marker.setLatLng([lat, lng])
+    console.log(lat + "," + lng)
+  });
  
 }
 
