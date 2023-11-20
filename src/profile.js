@@ -2,7 +2,7 @@
 
 class Profile
 {
-    constructor(profile)
+    constructor()
     {
         this.graph = document.getElementById("chart");
         this.svg = document.getElementById("svg");
@@ -11,25 +11,13 @@ class Profile
 
     draw(profile)
     {
-        this.data = CSVToArray(profile);
-        console.log(this.data[1][1]);        
-      
+        this.data = CSVToArray(profile);  
+
         let path = document.createElementNS('http://www.w3.org/2000/svg',"path");
         let maxalt = Math.max(...this.data[1]);
         this.xstep = this.graph.offsetWidth / this.data[1].length;
         this.ystep = this.graph.offsetHeight / (Math.ceil(maxalt/1000)*1000);
-        let curve_str = "M0.0," + (this.graph.offsetHeight - this.data[1][0]*this.ystep);
-      
-        for (let index = 1; index < (this.data[1].length-1); index++) {
-          curve_str += "L" + index*this.xstep + "," + (this.graph.offsetHeight - this.data[1][index]*this.ystep);
-        }
-      
-        path.setAttribute("d",curve_str);
-        path.setAttribute("stroke","#3A00E5");
-        path.setAttribute("fill","none");
-        path.setAttribute("stroke-width","3");
-        this.svg.appendChild(path);
-      
+        
         let axes = document.createElementNS('http://www.w3.org/2000/svg',"g");
         let alt_line = document.createElementNS('http://www.w3.org/2000/svg',"path");
         let altline_str = "";
@@ -56,15 +44,30 @@ class Profile
         this.cursor = document.createElementNS('http://www.w3.org/2000/svg',"path");
         axes.appendChild(this.cursor);
         axes.appendChild(alt_line);
+        
+        let curve_str = "M0.0," + (this.graph.offsetHeight - this.data[1][0]*this.ystep);
+      
+        for (let index = 1; index < (this.data[1].length-1); index++) {
+          curve_str += "L" + index*this.xstep + "," + (this.graph.offsetHeight - this.data[1][index]*this.ystep);
+        }
+      
+        path.setAttribute("d",curve_str);
+        path.setAttribute("stroke","#3A00E5");
+        path.setAttribute("fill","none");
+        path.setAttribute("stroke-width","3");
+        this.svg.appendChild(path);        
         this.svg.appendChild(axes);        
     }
 
-    listen(callback)
+    listen(callback_move,callback_scroll)
     {
         this.graph.addEventListener("mousemove", (event) => {
             let i = Math.trunc(event.offsetX/this.xstep);
             this.cursor.setAttribute("d","M" + event.offsetX + ",0V" + this.graph.offsetHeight);
-            callback(this.data[4][i],this.data[5][i])
+            callback_move(this.data[4][i],this.data[5][i]);
+        });
+        this.graph.addEventListener("wheel", (event) => {
+            callback_scroll(event.wheelDelta);
         });
     }
 

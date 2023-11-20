@@ -60,7 +60,16 @@ function load_flght(flight)
   profile.draw(flight.profile);
   profile.listen((lat,lng) => {
     marker.setLatLng([lat, lng])
-    console.log(lat + "," + lng)
+  },
+  (wheelDelta) => {
+    let zoom = map.getZoom();
+    if(wheelDelta < 0)
+    {
+      zoom -= 1
+    }else{
+      zoom += 1
+    }
+    map.setView([marker._latlng.lat,marker._latlng.lng],zoom);
   });
  
 }
