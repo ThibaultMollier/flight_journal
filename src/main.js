@@ -4,7 +4,15 @@ const { invoke } = window.__TAURI__.tauri;
 
 var map = L.map('map').setView([45.5, 6.2], 10);
 let trace = L.geoJSON().addTo(map);
-let marker = L.marker([0,0]).addTo(map);
+// let marker = L.marker([0,0]).addTo(map);
+let marker = L.circleMarker([0,0],{
+  radius: 6,
+  fillColor: "#3A00E5",
+  fillOpacity:1,
+  color: "white",
+  weight: 1,
+  opacity:0.5,
+}).addTo(map);
 
 // L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 //     maxZoom: 19,
