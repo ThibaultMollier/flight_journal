@@ -72,9 +72,13 @@ class Profile
             let i = Math.trunc(event.offsetX/this.xstep);
             let xpos = event.offsetX + 5;
             let ypos = event.offsetY;
-            if(event.offsetX > 0.9*this.graph.offsetWidth)
+            if(event.offsetX > 0.95*this.graph.offsetWidth)
             {
-                xpos -= 80;
+                xpos = 0.95*this.graph.offsetWidth;
+            }
+            if(event.offsetY < 0.3*this.graph.offsetHeight)
+            {
+                ypos = 0.3*this.graph.offsetHeight;
             }
             this.cursor.setAttribute("d","M" + event.offsetX + ",0V" + this.graph.offsetHeight);
             this.pointdata_text.setAttribute("x",xpos);
@@ -83,7 +87,7 @@ class Profile
             let time = new Date(this.data[0][i]*1000);
 
             this.pointdata_text.children[0].textContent = time.getHours() + ":" + time.getMinutes().toString().padStart(2,'0');
-            this.pointdata_text.children[0].setAttribute('dy', "1.8rem");
+            this.pointdata_text.children[0].setAttribute('dy', "-3.5rem");
             this.pointdata_text.children[0].setAttribute('x',xpos);
             this.pointdata_text.children[1].textContent = this.data[1][i] + "m";
             this.pointdata_text.children[1].setAttribute('dy', "1.2rem");
