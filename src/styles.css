@@ -23,7 +23,7 @@ body
   height: 100vh; 
   width: 100vw;
   display: grid;
-  grid-template-columns: 28rem 1fr;
+  grid-template-columns: 30rem 1fr;
   grid-template-rows: 10rem 1fr 5rem 15rem;
   margin: 0; 
   padding: 0 ;
@@ -49,11 +49,67 @@ li:hover
   cursor: pointer;
 }
 
-#tree li
+.year
+{
+  font-size: 1.25rem;
+  font-weight: bolder;
+}
+
+.month
+{
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0;
+  padding: 0 1rem;
+}
+
+.year div
+{
+  display: flex;
+}
+
+ul img
+{
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.year.close ul
+{
+  display: none;
+}
+
+ul div img{
+  transition: all 0.3s ease;
+}
+
+.close div img
+{
+  transition: all 0.3s ease;
+  transform: rotate(180deg);
+}
+
+.month.close li
+{
+  display: none;
+}
+
+.month li
 {
   display: flex;
   gap: 0.25rem; 
   padding: 0.3rem 0 0.3rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.month div:hover
+{
+  cursor: pointer;
+}
+.year div:hover
+{
+  cursor: pointer;
 }
 
 #tree li img

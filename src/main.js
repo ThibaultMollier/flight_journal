@@ -83,77 +83,14 @@ function load_flght(flight)
 }
 
 // Tree list
+let tree = new Tree();
 
-invoke('history').then((history) => build_tree(history))
-
-
-function format_duration(duration)
-{
-  let duration_str = "";
-  let hour = Math.trunc(duration/60);
-  if (hour != 0) 
-  {
-    duration_str += hour +"h"
-  }
-  let min = Math.trunc(duration%60);
-  if (min < 10)
-  {
-    duration_str += "0"
-  }
-  duration_str += min +"min"
-  duration_str = duration_str.padEnd(8,'\u2000');
-  return duration_str;
-}
-
-function format_distance(score,type)
-{
-  let multiplier = 1000;
-
-  if (type == '"tri"')
-  {
-    multiplier = 1200;
-  }else if(type == '"fai"')
-  {
-    multiplier = 1400;
-  }
-
-  let distance_str = (score/multiplier).toFixed(1) + "km";
-  distance_str = distance_str.padEnd(7,'\u2000');
-  return distance_str;
-}
-
-function build_tree(flightlist) {
-  let tree = document.getElementById("tree");
-
-  for (const key in flightlist) {
-    if (Object.hasOwnProperty.call(flightlist, key)) {
-      const element = flightlist[key];
-
-      let list_element = document.createElement("li");
-
-      list_element.addEventListener('click',flight_select,false);
-      list_element.flight_id = element.flight_id;
-
-      list_element.innerHTML = "<img src=\"assets/Icons_calendar.svg\"><div>"+ element.date +"</div>";
-      list_element.innerHTML += "<img src=\"assets/Icons_clock.svg\"><div>"+ format_duration(element.duration)+"</div>";
-      if(element.code == '"tri"' || element.code == '"fai"')
-      {
-        list_element.innerHTML += "<img src=\"assets/Icons_tri.svg\">"
-      }else
-      {
-        list_element.innerHTML += "<img src=\"assets/Icons_op.svg\">"
-      }
-      list_element.innerHTML += "<div>"+ format_distance(element.score,element.code)+"</div>";
-
-      tree.append(list_element);
-    }
-  }
-}
+invoke('history').then((history) => tree.build_tree(history,flight_select));
 
 function flight_select(evt) {
   let prev = document.getElementById('selected');
   if (prev != null){
-    prev.removeAttribute('id')
+      prev.removeAttribute('id')
   }
   evt.currentTarget.setAttribute('id','selected');
   invoke('select', {id:parseInt(evt.currentTarget.flight_id)}).then((flight) => load_flght(flight));
