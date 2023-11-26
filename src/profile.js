@@ -72,9 +72,9 @@ class Profile
             let i = Math.trunc(event.offsetX/this.xstep);
             let xpos = event.offsetX + 5;
             let ypos = event.offsetY;
-            if(event.offsetX > 0.95*this.graph.offsetWidth)
+            if(event.offsetX > 0.94*this.graph.offsetWidth)
             {
-                xpos = 0.95*this.graph.offsetWidth;
+                xpos = 0.94*this.graph.offsetWidth;
             }
             if(event.offsetY < 0.3*this.graph.offsetHeight)
             {

@@ -7,15 +7,15 @@ mod logbook;
 mod flight_track;
 
 #[tauri::command]
-fn history() -> Vec<FlightTable>{
-    let flights = FlightTable::select_all().unwrap();
-    flights
+fn history() -> Result<Vec<FlightTable>, String>{
+    let flights = FlightTable::select_all().map_err(|err| err.to_string())?;
+    Ok(flights)
 }
 
 #[tauri::command]
-fn select(id: u32) -> FlightTable{
-    let flight = FlightTable::get(id).unwrap();
-    flight
+fn select(id: u32) -> Result<FlightTable,String>{
+    let flight = FlightTable::get(id).map_err(|err| err.to_string())?;
+    Ok(flight)
 }
 
 fn main() {

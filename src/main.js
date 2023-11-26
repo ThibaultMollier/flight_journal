@@ -85,7 +85,7 @@ function load_flght(flight)
 // Tree list
 let tree = new Tree();
 
-invoke('history').then((history) => tree.build_tree(history,flight_select));
+invoke('history').then((history) => tree.build_tree(history,flight_select)).catch((error) => alert(error));
 
 function flight_select(evt) {
   let prev = document.getElementById('selected');
@@ -93,7 +93,7 @@ function flight_select(evt) {
       prev.removeAttribute('id')
   }
   evt.currentTarget.setAttribute('id','selected');
-  invoke('select', {id:parseInt(evt.currentTarget.flight_id)}).then((flight) => load_flght(flight));
+  invoke('select', {id:parseInt(evt.currentTarget.flight_id)}).then((flight) => load_flght(flight)).catch((error) => alert(error));;
 }
 
 window.addEventListener("DOMContentLoaded", () => {

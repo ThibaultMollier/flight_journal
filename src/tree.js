@@ -20,14 +20,26 @@ class Tree
 
                 if(y == undefined)
                 {
+                    
                     y = document.createElement("ul");
-                    let i = document.createElement("img");
-                    i.setAttribute("src","assets/Icons_arrow.svg");
                     let t = document.createElement("div");
+                    let i = document.createElement("img");
+                    let checkbox = document.createElement("input");
+                    let label = document.createElement("label");
+
                     year.set(element.date.substring(0, 4),y);
-                    t.textContent = element.date.substring(0, 4);
+
                     y.setAttribute("class","year close");
+                    i.setAttribute("src","assets/Icons_arrow.svg");
+                    checkbox.setAttribute("type","checkbox");
+                    checkbox.setAttribute("id","checkbox");
+                    label.setAttribute("for","checkbox");
+                    label.textContent = element.date.substring(0, 4);
+                    
                     t.addEventListener('click',this.year_ckick);
+        
+                    t.append(checkbox);
+                    t.append(label);
                     t.append(i);
                     y.append(t);
                     tree.append(y);
