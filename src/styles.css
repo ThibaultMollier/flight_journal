@@ -24,12 +24,113 @@ body
   width: 100vw;
   display: grid;
   grid-template-columns: 30rem 1fr;
-  grid-template-rows: 10rem 1fr 5rem 15rem;
+  grid-template-rows: 10rem 1fr 15rem;
   margin: 0; 
   padding: 0 ;
 }
 
 #head
+{
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  /* background-color: #3A00E5; */
+}
+
+#list
+{
+  grid-column: 1;
+  grid-row: 2 / 4;
+  overflow: hidden;
+  overflow-y: scroll;
+}
+
+#list li div
+{
+  display: flex;
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+#list li
+{
+  display: block;
+  padding: 0.25rem 0rem;
+}
+
+#list ul
+{
+  padding: 0 1rem;
+}
+
+#map{
+  grid-column: 2;
+  grid-row: 1 / 4;
+  z-index: 1;
+}
+
+#data
+{
+  background-color: #ffffffa0;
+  grid-column: 2;
+  grid-row: 3;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 5rem 1fr;
+}
+
+#chart
+{
+  display: flex;
+  grid-column: 1 / 5;
+  grid-row: 2;
+}
+
+#svg
+{
+  width: 100%;
+}
+
+.close ul {
+  display: none;
+}
+
+.flight:hover
+{
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.icon
+{
+  width: 1.2rem;
+  height: 1.25rem;
+  margin: 0rem 0.5rem;
+}
+
+#selected
+{
+  background-color: #3A00E5;
+  color: #ffffff;
+}
+
+#selected img
+{
+  filter: brightness(0) invert(1);
+}
+
+.arrow{
+  transition: all 0.3s ease;
+}
+
+.close .arrow
+{
+  transition: all 0.3s ease;
+  transform: rotate(180deg);
+}
+
+/*#head
 {
   grid-column: 1;
   grid-row: 1;
@@ -154,5 +255,5 @@ ul div img{
   grid-column: 1 / 5;
   grid-row: 2;
   display: flex;
-}
+} */
 

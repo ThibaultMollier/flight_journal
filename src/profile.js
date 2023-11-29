@@ -11,30 +11,52 @@ class Profile
 
     draw(profile)
     {
+
+        this.fontSize = window.getComputedStyle(this.graph).fontSize;
+        this.fontSize = parseInt(this.fontSize);
         this.data = CSVToArray(profile);  
 
         let path = document.createElementNS('http://www.w3.org/2000/svg',"path");
         let maxalt = Math.max(...this.data[1]);
-        this.xstep = this.graph.offsetWidth / this.data[1].length;
-        this.ystep = this.graph.offsetHeight / (Math.ceil(maxalt/1000)*1000);
+        // this.width_offset = this.graph.offsetWidth*0.06;
+        // this.height_offset = this.graph.offsetHeight*0.3;
+        this.width_offset = this.fontSize*6;
+        this.height_offset = this.fontSize*3;
+        this.xstep = (this.graph.offsetWidth - this.width_offset) / this.data[1].length;
+        this.ystep = (this.graph.offsetHeight - this.height_offset) / (Math.ceil(maxalt/1000)*1000);
         
         let axes = document.createElementNS('http://www.w3.org/2000/svg',"g");
         let alt_line = document.createElementNS('http://www.w3.org/2000/svg',"path");
         let altline_str = "";
 
         let altstep = 1000;
-        if(maxalt <= 2000)
+        if(maxalt <= 1500)
         {
             altstep = 500;
         }
       
-        for (let alt = altstep; alt < (Math.ceil(maxalt/1000)*1000); alt+=altstep) {
+        for (let alt = 0; alt <= (Math.ceil(maxalt/1000)*1000); alt+=altstep) {
           let text = document.createElementNS('http://www.w3.org/2000/svg',"text");
-          text.setAttribute("x",0);
-          text.setAttribute("y",(this.graph.offsetHeight - alt*this.ystep));
+          text.setAttribute("x",this.fontSize*0.5);
+          text.setAttribute("y",(this.graph.offsetHeight - alt*this.ystep - this.height_offset/2) + this.fontSize*0.25);
           text.textContent = alt + "m";
-          altline_str += "M0," + (this.graph.offsetHeight - alt*this.ystep) +"H" + this.graph.offsetWidth;
+          altline_str += "M"+ this.width_offset*0.8 +"," + (this.graph.offsetHeight - alt*this.ystep - this.height_offset/2) +"H" + (this.graph.offsetWidth - this.width_offset*0.2);
           axes.appendChild(text);
+        }
+
+        let timestep = 1800;
+        if(this.data[1].length <= 3600)
+        {
+            timestep = 600;
+        }
+
+        for (let i = 0; i <= this.data[1].length; i += timestep) {
+            let time = new Date(this.data[0][i]*1000);
+            let text = document.createElementNS('http://www.w3.org/2000/svg',"text");
+            text.setAttribute("x",(i*this.xstep + this.width_offset*0.8) - this.fontSize*1.5);
+            text.setAttribute("y",(this.graph.offsetHeight - this.fontSize*0.25));
+            text.textContent = time.getHours() + ":" + time.getMinutes().toString().padStart(2,'0');
+            axes.appendChild(text);
         }
 
         this.pointdata_text = document.createElementNS('http://www.w3.org/2000/svg',"text");
@@ -46,16 +68,16 @@ class Profile
       
         alt_line.setAttribute("d",altline_str);
         axes.setAttribute("stroke","#7c7c7c");
-        axes.setAttribute("opacity","0.8");
+        axes.setAttribute("opacity","1");
       
         this.cursor = document.createElementNS('http://www.w3.org/2000/svg',"path");
         axes.appendChild(this.cursor);
         axes.appendChild(alt_line);
         
-        let curve_str = "M0.0," + (this.graph.offsetHeight - this.data[1][0]*this.ystep);
+        let curve_str = "M"+ (this.width_offset*0.8) +"," + (this.graph.offsetHeight - this.data[1][0]*this.ystep - this.height_offset/2);
       
         for (let index = 1; index < (this.data[1].length-1); index++) {
-          curve_str += "L" + index*this.xstep + "," + (this.graph.offsetHeight - this.data[1][index]*this.ystep);
+          curve_str += "L" + (index*this.xstep + this.width_offset*0.8) + "," + (this.graph.offsetHeight - this.data[1][index]*this.ystep - this.height_offset/2);
         }
       
         path.setAttribute("d",curve_str);
@@ -69,16 +91,22 @@ class Profile
     listen(callback_move,callback_scroll)
     {
         this.graph.addEventListener("mousemove", (event) => {
-            let i = Math.trunc(event.offsetX/this.xstep);
+            let i = Math.trunc((event.offsetX - this.width_offset*0.8)/this.xstep);
+
+            if(event.offsetX < this.width_offset*0.8 || event.offsetX > (this.graph.offsetWidth-this.width_offset*0.2))
+            {
+                return;
+            }
+
             let xpos = event.offsetX + 5;
             let ypos = event.offsetY;
-            if(event.offsetX > 0.94*this.graph.offsetWidth)
+            if(event.offsetX > (this.graph.offsetWidth - this.fontSize*6))
             {
-                xpos = 0.94*this.graph.offsetWidth;
+                xpos = this.graph.offsetWidth - this.fontSize*6;
             }
-            if(event.offsetY < 0.3*this.graph.offsetHeight)
+            if(event.offsetY < (this.fontSize*5))
             {
-                ypos = 0.3*this.graph.offsetHeight;
+                ypos = this.fontSize*5;
             }
             this.cursor.setAttribute("d","M" + event.offsetX + ",0V" + this.graph.offsetHeight);
             this.pointdata_text.setAttribute("x",xpos);

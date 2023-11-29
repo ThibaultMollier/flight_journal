@@ -25,7 +25,7 @@ L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 
-function load_flght(flight)
+function load_flight(flight)
 {
   marker.setLatLng([0, 0]);
   trace.remove();
@@ -61,7 +61,7 @@ function load_flght(flight)
     }
   });
   trace.addTo(map);
-  map.fitBounds(trace.getBounds());
+  map.fitBounds(trace.getBounds(),{paddingBottomRight: [0,200]});
   // map.setView([geojson.features[9].geometry.coordinates[1],geojson.features[9].geometry.coordinates[0]], 11);
 
   let profile = new Profile();
@@ -78,23 +78,23 @@ function load_flght(flight)
       zoom += 1
     }
     map.setView([marker._latlng.lat,marker._latlng.lng],zoom);
-  });
- 
+  }); 
 }
 
 // Tree list
-let tree = new Tree();
+//let tree = new Tree();
+// invoke('history').then((history) => tree.build_tree(history,flight_select)).catch((error) => alert(error));
 
-invoke('history').then((history) => tree.build_tree(history,flight_select)).catch((error) => alert(error));
+let flightlist = new FlightList(load_flight);
 
-function flight_select(evt) {
+/*function flight_select(evt) {
   let prev = document.getElementById('selected');
   if (prev != null){
       prev.removeAttribute('id')
   }
   evt.currentTarget.setAttribute('id','selected');
   invoke('select', {id:parseInt(evt.currentTarget.flight_id)}).then((flight) => load_flght(flight)).catch((error) => alert(error));;
-}
+}*/
 
 window.addEventListener("DOMContentLoaded", () => {
 
