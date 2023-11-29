@@ -4,6 +4,22 @@ const { invoke } = window.__TAURI__.tauri;
 
 var map = L.map('map').setView([45.5, 6.2], 10);
 let trace = L.geoJSON().addTo(map);
+let start_icon = L.icon({
+  iconUrl: '/assets/Icons_start.svg',
+
+  iconSize:     [26, 26], // size of the icon
+  iconAnchor:   [13, 13], // point of the icon which will correspond to marker's location
+  // popupAnchor:  [-3, -76] // point from which the popup should open relative to the iconAnchor
+});
+
+let end_icon = L.icon({
+  iconUrl: '/assets/Icons_end.svg',
+
+  iconSize:     [26, 26], // size of the icon
+  iconAnchor:   [13, 13], // point of the icon which will correspond to marker's location
+  // popupAnchor:  [-3, -76] // point from which the popup should open relative to the iconAnchor
+});
+
 // let marker = L.marker([0,0]).addTo(map);
 let marker = L.circleMarker([0,0],{
   radius: 6,
@@ -55,13 +71,13 @@ function load_flight(flight)
           color: "#000",
           weight: 1,
         });
-        case 'land0':
-        case 'launch0': return L.marker(latlng);
+        case 'land0': return L.marker(latlng,{icon: end_icon});
+        case 'launch0': return L.marker(latlng,{icon: start_icon});
       }
     }
   });
   trace.addTo(map);
-  map.fitBounds(trace.getBounds(),{paddingBottomRight: [0,200]});
+  map.fitBounds(trace.getBounds(),{paddingBottomRight: [0,250]});
   // map.setView([geojson.features[9].geometry.coordinates[1],geojson.features[9].geometry.coordinates[0]], 11);
 
   let profile = new Profile();

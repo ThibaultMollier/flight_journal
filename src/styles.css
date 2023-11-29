@@ -63,6 +63,23 @@ body
   padding: 0 1rem;
 }
 
+#list ul div
+{
+  padding: 0.25rem;
+  border-radius: 0.4rem;
+  width: fit-content;
+  /* background-color: #ffffff;
+  border: 1px solid #3A00E5 */
+}
+
+#list ul li ul li ul li div
+{
+  padding: 0;
+  border-radius: none;
+  background-color: #ffffff00;
+  border: none;
+}
+
 #map{
   grid-column: 2;
   grid-row: 1 / 4;
@@ -121,6 +138,8 @@ body
 }
 
 .arrow{
+  margin-left: 0.75rem;
+  margin-left: 0.2rem;
   transition: all 0.3s ease;
 }
 
